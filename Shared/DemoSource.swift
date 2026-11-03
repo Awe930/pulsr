@@ -31,6 +31,7 @@ final class DemoSource: HealthDataSource {
         raw.sleep = sleep
         let readiness = rng.normal() + (sleepHours - 7.2) * 0.6
         raw.hrv = (52 + readiness * 9 + fitnessTrend * 6).clamped(22, 110)
+        raw.hrvSampleCount = 3 + Int((rng.normal() + 1.5).clamped(0, 4))
         raw.restingHR = (54 - readiness * 2.2 - fitnessTrend * 2).clamped(44, 70)
         raw.respiratoryRate = 14.6 + rng.normal() * 0.4
         raw.wristTemperature = 34.9 + rng.normal() * 0.15

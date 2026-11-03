@@ -61,10 +61,35 @@ struct AuroraBackground: View {
 struct Eyebrow: View {
     var text: String
     var body: some View {
-        Text(text.uppercased())
-            .font(.system(size: 10.5, weight: .medium, design: .monospaced))
-            .tracking(1.4)
+        Text(text)
+            .font(.footnote)
             .foregroundStyle(.secondary)
+    }
+}
+
+/// Three small bars plus a line saying what the score rests on.
+struct ConfidenceChip: View {
+    var level: ScoreConfidence
+    var detail: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 3) {
+                ForEach(1...3, id: \.self) { i in
+                    Capsule()
+                        .fill(i <= level.rawValue ? Color.primary : Color.primary.opacity(0.2))
+                        .frame(width: 10, height: 5)
+                }
+            }
+            .accessibilityHidden(true)
+            Text(detail.isEmpty ? level.title : "\(level.title) · \(detail)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .glassEffect(.regular, in: .capsule)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -129,9 +154,8 @@ struct ContributorRow: View {
                 .font(.body)
                 .frame(width: 26)
                 .foregroundStyle(.secondary)
-            Text(title.uppercased())
+            Text(title)
                 .font(.footnote.weight(.semibold))
-                .tracking(1)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             Spacer(minLength: 8)
@@ -181,10 +205,9 @@ struct InsightCallout: View {
                 Button {
                     onAction?()
                 } label: {
-                    Label(action.uppercased(), systemImage: "arrow.right")
+                    Label(action, systemImage: "arrow.right")
                         .labelStyle(TrailingIconLabelStyle())
                         .font(.caption.weight(.bold))
-                        .tracking(1.2)
                         .foregroundStyle(LinearGradient(colors: [Color(hex: 0x8FA8FF), Color(hex: 0xB28CFF)], startPoint: .leading, endPoint: .trailing))
                 }
                 .buttonStyle(.plain)
@@ -224,9 +247,8 @@ struct HeroRing: View {
                 .padding(.top, 26)
                 .padding(.bottom, 18)
             BigNumber(text: value, unit: unit, size: 66)
-            Text(caption.uppercased())
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .tracking(1.8)
+            Text(caption)
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -248,7 +270,7 @@ struct DetailScaffold<Content: View>: View {
         }
         .scrollIndicators(.hidden)
         .background { AuroraBackground(accent: accent) }
-        .navigationTitle(title.uppercased())
+        .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
     }
 }

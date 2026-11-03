@@ -23,7 +23,7 @@ struct OnboardingView: View {
                         .padding(.top, 70)
                         .padding(.bottom, 10)
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("PULSR").font(.subheadline.weight(.semibold)).tracking(6).foregroundStyle(.secondary)
+                        Text("Nine30").font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
                         Text("Your Apple Watch,\nfully understood.")
                             .font(.system(size: 38, weight: .bold, design: .rounded))
                         Text("Open source. No subscription. Your health data never leaves your iPhone.")
@@ -82,7 +82,7 @@ struct OnboardingView: View {
                         }
                         .buttonStyle(.glass)
 
-                        Text("Pulsr is not a medical device and does not diagnose anything.")
+                        Text("Nine30 is not a medical device and does not diagnose anything.")
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                             .frame(maxWidth: .infinity)

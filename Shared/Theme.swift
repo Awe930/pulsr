@@ -5,9 +5,10 @@ enum Theme {
     static let sleep = [Color.adaptive(0x6B5CE6, 0xA9A0FF), Color.adaptive(0x8B6CF0, 0xB49BFF)]
     static let strain = [Color.adaptive(0x0A8FD1, 0x2FD4FF), Color.adaptive(0x2F5BE0, 0x4F7BFF)]
     static let stress = [Color.adaptive(0x1E9BD7, 0x5AC8FA), Color.adaptive(0x0DB877, 0x30E0A1), Color.adaptive(0xD98200, 0xFFB340)]
-    static let green = Color.adaptive(0x0DB877, 0x2EF2A0)
-    static let yellow = Color.adaptive(0xC98F00, 0xFFD84D)
-    static let red = Color.adaptive(0xE0364F, 0xFF5A6E)
+    // Zone colours: the one accent each screen gets. Dark values match the Nine30 design canvas.
+    static let green = Color.adaptive(0x0DA56B, 0x3DDC97)
+    static let yellow = Color.adaptive(0xB07E00, 0xF5C451)
+    static let red = Color.adaptive(0xD8452F, 0xFF7A6B)
     static let helps = Color.adaptive(0x0DB877, 0x2EF2A0)
     static let hurts = Color.adaptive(0xD9731A, 0xFFA845)
     static let screen = Color.adaptive(0xF2F4F7, 0x020306)
@@ -107,6 +108,6 @@ extension Double {
 }
 
 extension Date {
-    var dayLabel: String { formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()).uppercased() }
+    var dayLabel: String { formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()) }
     var shortTime: String { formatted(date: .omitted, time: .shortened) }
 }

@@ -81,7 +81,10 @@ final class HealthKitSource: HealthDataSource {
 
             // Nightly metrics: samples recorded during the sleep window (or 00:00–08:00 without sleep data).
             let window: ClosedRange<Date> = raw.sleep.map { $0.start...$0.end } ?? day...day.addingTimeInterval(8 * 3600)
-            raw.hrv = mean(hrvAll.filter { window.contains($0.date) }.map(\.value))
+            // Median, not mean: one noisy reading should not move the whole night.
+            let nightHRV = hrvAll.filter { window.contains($0.date) }.map(\.value)
+            raw.hrv = median(nightHRV)
+            raw.hrvSampleCount = nightHRV.count
             raw.respiratoryRate = mean(respAll.filter { window.contains($0.date) }.map(\.value))
             raw.spo2 = mean(spo2All.filter { window.contains($0.date) }.map(\.value))
             raw.wristTemperature = tempAll.last { $0.date >= day.addingTimeInterval(-9 * 3600) && $0.date < next }?.value
@@ -183,6 +186,12 @@ final class HealthKitSource: HealthDataSource {
 
     private func mean(_ values: [Double]) -> Double? {
         values.isEmpty ? nil : values.reduce(0, +) / Double(values.count)
+    }
+
+    private func median(_ values: [Double]) -> Double? {
+        guard !values.isEmpty else { return nil }
+        let s = values.sorted(), mid = s.count / 2
+        return s.count % 2 == 1 ? s[mid] : (s[mid - 1] + s[mid]) / 2
     }
 
     static func describe(_ type: HKWorkoutActivityType) -> (name: String, symbol: String, strength: Bool) {

@@ -199,14 +199,13 @@ struct JournalInsightsView: View {
             .padding(.top, 8)
 
             HStack {
-                Label("HURTS", systemImage: "arrowtriangle.down.fill").foregroundStyle(Theme.hurts)
+                Label("Hurts", systemImage: "arrowtriangle.down.fill").foregroundStyle(Theme.hurts)
                 Spacer()
-                Text("% IMPACT").foregroundStyle(.secondary)
+                Text("Impact").foregroundStyle(.secondary)
                 Spacer()
-                Label("HELPS", systemImage: "arrowtriangle.up.fill").foregroundStyle(Theme.helps)
+                Label("Helps", systemImage: "arrowtriangle.up.fill").foregroundStyle(Theme.helps)
             }
             .font(.caption.weight(.bold))
-            .tracking(1)
 
             if impacts.isEmpty {
                 GlassCard {
@@ -228,7 +227,7 @@ struct ImpactRow: View {
         let color = impact.percent >= 0 ? Theme.helps : Theme.hurts
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(impact.behavior.title.uppercased()).font(.footnote.weight(.semibold)).tracking(1)
+                Text(impact.behavior.title).font(.footnote.weight(.semibold))
                 Spacer()
                 Text(String(format: "%+.0f%%", impact.percent))
                     .font(.system(.callout, design: .rounded).weight(.bold))

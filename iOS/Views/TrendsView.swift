@@ -107,7 +107,7 @@ struct TrendsView: View {
     private func stat(_ title: String, _ value: String, _ color: Color) -> some View {
         VStack(spacing: 6) {
             Text(value).font(.system(.title2, design: .rounded).weight(.bold)).foregroundStyle(color)
-            Text(title.uppercased()).font(.caption2.weight(.semibold)).tracking(1).foregroundStyle(.secondary)
+            Text(title).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)

@@ -49,7 +49,7 @@ private struct SummaryPage: View {
             VStack(spacing: 0) {
                 Text(day?.recovery.map { "\($0.percent)%" } ?? "–")
                     .font(.system(size: 30, weight: .thin))
-                Text("RECOVERY").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(1).foregroundStyle(.secondary)
+                Text("Recovery").font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary)
             }
             HStack(spacing: 12) {
                 Text("Sleep ").foregroundStyle(.secondary) + Text(day?.sleepPerformance.map { "\($0.percent)%" } ?? "–").foregroundStyle(Theme.sleep[0])
@@ -57,7 +57,7 @@ private struct SummaryPage: View {
             }
             .font(.system(size: 12, weight: .medium))
         }
-        .navigationTitle("Pulsr")
+        .navigationTitle("Nine30")
     }
 
     private func mini(progress: Double, colors: [Color], value: String, title: String) -> some View {
@@ -66,7 +66,7 @@ private struct SummaryPage: View {
                 Text(value).font(.system(size: 13, weight: .bold, design: .rounded)).minimumScaleFactor(0.7)
             }
             .frame(width: 50, height: 50)
-            Text(title).font(.system(size: 8, weight: .semibold)).tracking(1).foregroundStyle(.secondary)
+            Text(title).font(.system(size: 8, weight: .semibold)).foregroundStyle(.secondary)
         }
     }
 }

@@ -56,7 +56,7 @@ struct StressView: View {
                         HStack {
                             ForEach(0..<3) { i in
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(["LOW", "MEDIUM", "HIGH"][i]).font(.caption2.weight(.bold)).tracking(1).foregroundStyle(Theme.stress[i])
+                                    Text(["Low", "Medium", "High"][i]).font(.caption2.weight(.bold)).foregroundStyle(Theme.stress[i])
                                     Text("\(Int(shares[i] * 100))%").font(.system(.callout, design: .rounded).weight(.semibold))
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -88,8 +88,8 @@ struct StressGauge: View {
                 .rotationEffect(.degrees(-135 + 270 * value / 3))
             VStack(spacing: 2) {
                 BigNumber(text: value.oneDecimal, size: 56)
-                Text(StressLevel(value).rawValue.uppercased())
-                    .font(.headline).tracking(1.5)
+                Text(StressLevel(value).rawValue)
+                    .font(.headline)
                     .foregroundStyle(Theme.stressColor(value))
                 if let updated {
                     Text("Last updated \(updated.shortTime)").font(.caption).foregroundStyle(.secondary)
@@ -116,7 +116,7 @@ struct BodyAgeView: View {
                         .opacity(0.9)
                     VStack(spacing: 6) {
                         BigNumber(text: age.bodyAge.oneDecimal, size: 60)
-                        Text("BODY AGE").font(.headline).tracking(2).foregroundStyle(Color.primary.opacity(0.8))
+                        Text("Body age").font(.headline).foregroundStyle(Color.primary.opacity(0.8))
                         Text(age.difference <= 0 ? "\(abs(age.difference).oneDecimal) years younger" : "\(age.difference.oneDecimal) years older")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(age.difference <= 0 ? Theme.green : Theme.hurts)
@@ -129,7 +129,7 @@ struct BodyAgeView: View {
                         HStack {
                             Eyebrow(text: "What moves it")
                             Spacer()
-                            Text("YEARS").font(.caption2.weight(.bold)).tracking(1).foregroundStyle(.secondary)
+                            Text("Years").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
                         }
                         .padding(.bottom, 6)
                         ForEach(age.factors) { f in

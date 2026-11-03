@@ -109,9 +109,9 @@ struct CoachView: View {
                         HaloOrb(palette: .spectral, energy: 1, speed: coach.isThinking ? 2.2 : 1.3)
                             .frame(width: 96, height: 96)
                             .padding(.vertical, 26)
-                        Text("PULSR COACH").font(.subheadline.weight(.semibold)).tracking(3)
-                        Text(coach.isOnDevice ? "ON-DEVICE · APPLE INTELLIGENCE" : "OFFLINE MODE")
-                            .font(.caption2.weight(.bold)).tracking(1)
+                        Text("Nine30 Coach").font(.subheadline.weight(.semibold))
+                        Text(coach.isOnDevice ? "On-device · Apple Intelligence" : "Offline mode")
+                            .font(.caption2.weight(.bold))
                             .padding(.horizontal, 8).padding(.vertical, 3)
                             .glassEffect(.regular, in: .capsule)
                     }

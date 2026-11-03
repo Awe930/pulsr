@@ -73,7 +73,8 @@ struct WorkoutSummary: Hashable, Identifiable {
 struct RawDay: Hashable {
     var date: Date                    // start of the calendar day
     var sleep: SleepSession?          // the night that ended on this day's morning
-    var hrv: Double?                  // ms, SDNN averaged over the night
+    var hrv: Double?                  // ms, median of the night's SDNN readings
+    var hrvSampleCount = 0            // how many readings that median came from
     var restingHR: Double?            // bpm
     var respiratoryRate: Double?      // breaths / min, during sleep
     var wristTemperature: Double?     // °C, absolute sleeping wrist temperature
@@ -106,6 +107,34 @@ enum StressLevel: String {
     init(_ value: Double) { self = value < 1 ? .low : value < 2 ? .medium : .high }
 }
 
+/// How much data a day's Recovery rests on.
+enum ScoreConfidence: Int, Comparable {
+    case low = 1, medium = 2, high = 3
+
+    static func < (a: Self, b: Self) -> Bool { a.rawValue < b.rawValue }
+
+    var title: String {
+        switch self {
+        case .low: return "Low confidence"
+        case .medium: return "Medium confidence"
+        case .high: return "High confidence"
+        }
+    }
+}
+
+/// Where a vital sits against your own normal range.
+enum VitalStatus {
+    case below, typical, above
+
+    var title: String {
+        switch self {
+        case .below: return "Below range"
+        case .typical: return "Typical"
+        case .above: return "Above range"
+        }
+    }
+}
+
 struct Baseline: Hashable {
     var mean: Double
     var sd: Double
@@ -126,8 +155,17 @@ struct DayScores: Hashable, Identifiable {
     var respBaseline: Baseline?
     var tempBaseline: Baseline?
     var isCalibrating = true
+    var confidence: ScoreConfidence = .low
+    var confidenceDetail = ""
+    /// 7-day rolling HRV (geometric mean, ms) and where it sits against your range.
+    var hrvTrend: Double?
+    var hrvStatus: VitalStatus?
+    /// Your normal HRV band in ms: baseline ± half a standard deviation (the smallest worthwhile change).
+    var hrvRange: ClosedRange<Double>?
 
     // Sleep
+    /// Running sleep debt over the last 14 nights, recent nights weighted more. Extra sleep pays it back.
+    var sleepDebt: TimeInterval = 0
     var sleepPerformance: Double?
     var sleepNeed: TimeInterval = 8 * 3600
     var hoursVsNeeded: Double?

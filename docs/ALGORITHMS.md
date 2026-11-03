@@ -1,4 +1,6 @@
-# How Pulsr calculates its scores
+# How Nine30 calculates its scores
+
+Nine30 is a personal build of [Pulsr](https://github.com/0xCodez/pulsr). Changes from Pulsr are marked **(Nine30)**.
 
 All formulas live in [`Shared/ScoreEngine.swift`](../Shared/ScoreEngine.swift). They are transparent, simple and tunable — improvements backed by research are very welcome.
 
@@ -26,10 +28,31 @@ For each day, the previous 30 days form the baseline (mean and SD). While there 
 
 Scores are marked *calibrating* until 7 nights of HRV exist.
 
+**(Nine30)** A night's HRV is the **median** of the SDNN readings taken during sleep (Pulsr used the mean), so one noisy reading cannot move the night.
+
+## HRV trend and range (Nine30)
+
+```
+trend  = mean of ln HRV over the last 7 days (at least 3 nights)
+range  = exp(mean ± 0.5·SD)          the "smallest worthwhile change" band
+status = below / typical / above      trend compared with the range
+```
+
+The trend, not a single night, decides whether HRV is typical (the approach used in HRV-guided training research, e.g. Plews et al.).
+
+## Confidence (Nine30)
+
+```
+points = 2 if ≥ 5 HRV readings last night, 1 if ≥ 3
+       + 2 if ≥ 21 nights of baseline, 1 if ≥ 7
+       + 1 if a 7-day trend exists
+high ≥ 4 · medium ≥ 2 · low otherwise (and always low with no HRV last night)
+```
+
 ## Recovery (0–100 %)
 
 ```
-z_hrv  = (ln HRV − mean) / SD                       clamp ±3
+z_hrv  = 0.5·z(last night) + 0.5·z(7-day trend)    each clamped ±3   (Nine30; Pulsr used last night only)
 z_rhr  = −(RHR − mean) / SD                         clamp ±3
 z_resp = −|resp − mean| / SD                        clamp 0…3
 z_sleep = (sleepPerformance − 0.85) / 0.12          clamp −3…2
@@ -57,9 +80,12 @@ Strain target by recovery: green 14–18, yellow 10–14, red 4–10.
 ## Sleep
 
 ```
+debt = max(0, Σ over last 14 nights of  w · (goal − asleep))      w = 1 for last night … 1/14 two weeks ago
+       nights above goal pay debt back; nights with no data are skipped            (Nine30)
+
 need = goal (default 7 h 45)
      + 0.06 h × (yesterday's strain − 10)              if strain > 10
-     + 0.25 × Σ last 3 nights' shortfall vs. goal      capped at 1.5 h
+     + 0.2 × yesterday's sleep debt                    capped at 1 h      (Nine30; Pulsr used 0.25 × 3 nights' shortfall)
 
 hoursVsNeeded = min(1, asleep / need)
 efficiency    = asleep / time between first and last sleep sample

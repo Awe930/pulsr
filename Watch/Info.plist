@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Pulsr</string>
+	<string>Nine30</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -21,12 +21,12 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Pulsr reads heart rate, HRV and sleep from this watch to show your Recovery, Strain and Sleep scores.</string>
+	<string>Nine30 reads heart rate, HRV and sleep from this watch to show your Recovery, Strain and Sleep scores.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Pulsr does not write any data to Apple Health.</string>
+	<string>Nine30 does not write any data to Apple Health.</string>
 	<key>WKApplication</key>
 	<true/>
 	<key>WKCompanionAppBundleIdentifier</key>
-	<string>$(BUNDLE_ID_PREFIX).pulsr</string>
+	<string>$(BUNDLE_ID_PREFIX).nine30</string>
 </dict>
 </plist>

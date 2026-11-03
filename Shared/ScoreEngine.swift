@@ -21,6 +21,16 @@ enum ScoreEngine {
             s.tempBaseline = baseline(history.compactMap(\.wristTemperature), prior: nil)
             s.isCalibrating = history.compactMap(\.hrv).count < calibrationNights
 
+            // 7-day HRV trend against your range (Plews-style: the trend carries the verdict, one night does not).
+            let lastWeek = days[max(0, i - 6)...i].compactMap(\.hrv).map { log($0) }
+            if lastWeek.count >= 3, let base = s.hrvBaseline {
+                let trend = lastWeek.reduce(0, +) / Double(lastWeek.count)
+                let swc = 0.5 * base.sd
+                s.hrvTrend = exp(trend)
+                s.hrvRange = exp(base.mean - swc)...exp(base.mean + swc)
+                s.hrvStatus = trend < base.mean - swc ? .below : trend > base.mean + swc ? .above : .typical
+            }
+
             let strainResult = strain(heartRate: raw.heartRate, restingHR: raw.restingHR ?? s.rhrBaseline?.mean ?? 60, profile: profile, workouts: raw.workouts)
             s.strain = strainResult.strain
             s.zoneMinutes = strainResult.zoneMinutes
@@ -28,7 +38,8 @@ enum ScoreEngine {
             s.strengthMinutes = raw.workouts.filter(\.isStrength).map(\.duration).reduce(0, +) / 60
 
             let previous = result.last
-            s.sleepNeed = sleepNeed(profile: profile, previousStrain: previous?.strain, recent: Array(result.suffix(3)))
+            s.sleepNeed = sleepNeed(profile: profile, previousStrain: previous?.strain, debt: previous?.sleepDebt ?? 0)
+            s.sleepDebt = sleepDebt(days[max(0, i - 13)...i].map(\.sleep), goalHours: profile.sleepGoalHours)
             if let sleep = raw.sleep {
                 let priorSleeps = history.suffix(4).compactMap(\.sleep)
                 s.hoursVsNeeded = min(1, sleep.asleep / s.sleepNeed)
@@ -39,7 +50,10 @@ enum ScoreEngine {
                                             + 0.2 * (s.sleepEfficiency ?? 0.85))
             }
 
-            s.recovery = recovery(raw: raw, hrvBase: s.hrvBaseline, rhrBase: s.rhrBaseline, respBase: s.respBaseline, sleepPerformance: s.sleepPerformance)
+            s.recovery = recovery(raw: raw, hrvTrend: s.hrvTrend, hrvBase: s.hrvBaseline, rhrBase: s.rhrBaseline, respBase: s.respBaseline, sleepPerformance: s.sleepPerformance)
+            let trust = confidence(raw: raw, hrvNights: history.compactMap(\.hrv).count, hasTrend: s.hrvTrend != nil)
+            s.confidence = trust.0
+            s.confidenceDetail = trust.1
             s.stress = stress(heartRate: raw.heartRate, restingHR: raw.restingHR ?? s.rhrBaseline?.mean ?? 60,
                               maxHR: profile.maxHeartRate, sleep: raw.sleep, workouts: raw.workouts)
             result.append(s)
@@ -67,9 +81,12 @@ enum ScoreEngine {
 
     // MARK: Recovery (0–100)
 
-    static func recovery(raw: RawDay, hrvBase: Baseline?, rhrBase: Baseline?, respBase: Baseline?, sleepPerformance: Double?) -> Double? {
+    static func recovery(raw: RawDay, hrvTrend: Double?, hrvBase: Baseline?, rhrBase: Baseline?, respBase: Baseline?, sleepPerformance: Double?) -> Double? {
         guard let hrv = raw.hrv, let hrvBase else { return nil }
-        var composite = 0.55 * hrvBase.z(log(hrv)).clamped(-3, 3)
+        // Half last night, half the 7-day trend: the score still reacts to a bad night, but one noisy reading can't flip the day.
+        var zHRV = hrvBase.z(log(hrv)).clamped(-3, 3)
+        if let hrvTrend { zHRV = 0.5 * zHRV + 0.5 * hrvBase.z(log(hrvTrend)).clamped(-3, 3) }
+        var composite = 0.55 * zHRV
         var weight = 0.55
         if let rhr = raw.restingHR, let rhrBase {
             composite += 0.25 * -rhrBase.z(rhr).clamped(-3, 3); weight += 0.25
@@ -82,6 +99,18 @@ enum ScoreEngine {
         }
         composite /= weight
         return (100 / (1 + exp(-(1.25 * composite + 0.35)))).clamped(1, 99)
+    }
+
+    /// How much the day's Recovery can be trusted: readings last night, length of baseline, and whether a 7-day trend exists.
+    static func confidence(raw: RawDay, hrvNights: Int, hasTrend: Bool) -> (ScoreConfidence, String) {
+        guard raw.hrv != nil else { return (.low, "No HRV recorded last night") }
+        var points = 0
+        points += raw.hrvSampleCount >= 5 ? 2 : raw.hrvSampleCount >= 3 ? 1 : 0
+        points += hrvNights >= 21 ? 2 : hrvNights >= calibrationNights ? 1 : 0
+        points += hasTrend ? 1 : 0
+        let level: ScoreConfidence = points >= 4 ? .high : points >= 2 ? .medium : .low
+        let readings = raw.hrvSampleCount == 1 ? "1 HRV reading" : "\(raw.hrvSampleCount) HRV readings"
+        return (level, "\(readings) · \(hrvNights)-night baseline")
     }
 
     // MARK: Strain (0–21)
@@ -159,16 +188,26 @@ enum ScoreEngine {
 
     // MARK: Sleep
 
-    static func sleepNeed(profile: UserProfile, previousStrain: Double?, recent: [DayScores]) -> TimeInterval {
+    /// Tonight's need: your goal, plus extra after a hard day, plus a slice of your sleep debt (about a fifth a night, at most 1 h).
+    static func sleepNeed(profile: UserProfile, previousStrain: Double?, debt: TimeInterval) -> TimeInterval {
         var hours = profile.sleepGoalHours
         if let previousStrain, previousStrain > 10 { hours += (previousStrain - 10) * 0.06 }
-        // Debt is measured against the base goal so it cannot compound night over night.
-        let debt = recent.compactMap { d -> Double? in
-            guard let slept = d.raw.sleep?.asleep else { return nil }
-            return max(0, profile.sleepGoalHours * 3600 - slept) / 3600
-        }.reduce(0, +)
-        hours += min(debt * 0.25, 1.5)
+        hours += min(debt / 3600 * 0.2, 1.0)
         return hours * 3600
+    }
+
+    /// Sleep debt over the last 14 nights (oldest first, tonight last), measured against your goal so it cannot compound.
+    /// Recent nights weigh more: last night counts fully, two weeks ago about 1/14. Nights above goal pay debt back.
+    static func sleepDebt(_ nights: [SleepSession?], goalHours: Double) -> TimeInterval {
+        let n = nights.count
+        guard n > 0 else { return 0 }
+        var debt = 0.0
+        for (i, night) in nights.enumerated() {
+            guard let slept = night?.asleep else { continue }   // a night without data neither adds nor repays
+            let weight = Double(14 - (n - 1 - i)) / 14
+            debt += weight * (goalHours * 3600 - slept)
+        }
+        return max(0, debt)
     }
 
     /// 1 = went to bed and woke up at exactly the same times as the previous nights.

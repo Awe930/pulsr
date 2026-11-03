@@ -53,9 +53,8 @@ struct TodayView: View {
                     Button { withAnimation { store.step(-1) } } label: { Image(systemName: "chevron.left").frame(width: 22, height: 22) }
                         .buttonStyle(.glass).buttonBorderShape(.circle)
                         .disabled(store.selectedIndex == 0)
-                    Text(store.isToday ? "TODAY" : (store.selected?.date.dayLabel ?? ""))
+                    Text(store.isToday ? "Today" : (store.selected?.date.dayLabel ?? ""))
                         .font(.subheadline.weight(.semibold))
-                        .tracking(1.5)
                         .frame(minWidth: 110)
                         .padding(.vertical, 10)
                         .padding(.horizontal, 14)
@@ -81,13 +80,30 @@ struct TodayView: View {
         VStack(spacing: 0) {
             NavigationLink(value: Route.recovery) {
                 VStack(spacing: 0) {
-                    HaloOrb(palette: .recovery(d.recovery))
-                        .frame(width: 212, height: 212)
-                        .padding(.top, 22)
-                        .padding(.bottom, 26)
+                    // Smaller orb inside a ring that carries the zone colour, so the zone reads at a glance.
+                    ZStack {
+                        Circle().stroke(Theme.track, lineWidth: 6)
+                        Circle()
+                            .trim(from: 0, to: max(0.001, (d.recovery ?? 0) / 100))
+                            .stroke(Theme.recoveryColor(d.recovery), style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                        HaloOrb(palette: .recovery(d.recovery))
+                            .frame(width: 168, height: 168)
+                    }
+                    .frame(width: 220, height: 220)
+                    .padding(.top, 18)
+                    .padding(.bottom, 20)
                     BigNumber(text: d.recovery.map(\.percent) ?? "–", unit: d.recovery == nil ? nil : "%", size: 76)
-                    Eyebrow(text: d.recovery == nil ? "Recovery · waiting for sleep" : "Recovery · \(Insights.headline(d).title)")
-                        .padding(.top, 8)
+                    if d.recovery == nil {
+                        Text("Recovery · waiting for sleep").font(.subheadline).foregroundStyle(.secondary).padding(.top, 8)
+                    } else {
+                        (Text("Recovery · ").foregroundStyle(.secondary)
+                         + Text(Insights.headline(d).title).foregroundStyle(Theme.recoveryColor(d.recovery)).fontWeight(.semibold))
+                            .font(.subheadline)
+                            .padding(.top, 8)
+                        ConfidenceChip(level: d.confidence, detail: d.confidenceDetail)
+                            .padding(.top, 10)
+                    }
                 }
                 .frame(maxWidth: .infinity)
                 .contentShape(.rect)
@@ -95,11 +111,14 @@ struct TodayView: View {
             GlassEffectContainer(spacing: 10) {
                 HStack(spacing: 10) {
                     NavigationLink(value: Route.sleep) {
-                        MetricCapsule(progress: (d.sleepPerformance ?? 0) / 100, color: Theme.sleep[0],
-                                      value: d.sleepPerformance.map { "\($0.percent)%" } ?? "–", title: "Sleep")
+                        // Sleep debt is the headline sleep number; the ring fills as debt grows (full at 10 h).
+                        MetricCapsule(progress: d.sleepDebt / (10 * 3600), color: Theme.sleep[0],
+                                      value: String(format: "%.1f h", d.sleepDebt / 3600), title: "Sleep debt")
                     }
                     NavigationLink(value: Route.strain) {
-                        MetricCapsule(progress: d.strain / 21, color: Theme.strain[0], value: d.strain.oneDecimal, title: "Strain")
+                        let target = ScoreEngine.strainTarget(recovery: d.recovery)
+                        MetricCapsule(progress: d.strain / 21, color: Theme.strain[0], value: "\(d.strain.oneDecimal)/21",
+                                      title: "Strain · aim \(Int(target.lowerBound))–\(Int(target.upperBound))")
                     }
                 }
             }
@@ -112,13 +131,15 @@ struct TodayView: View {
 
     private func insight(_ d: DayScores) -> some View {
         let text = Insights.headline(d)
-        return GlassCard(tint: Theme.recoveryColor(d.recovery)) {
+        // Neutral glass: the zone colour lives in the dot and the ring, not in a tinted card.
+        return GlassCard {
             VStack(alignment: .leading, spacing: 8) {
-                HStack {
+                HStack(spacing: 8) {
+                    Circle().fill(Theme.recoveryColor(d.recovery)).frame(width: 8, height: 8)
                     Text(text.title).font(.title3.weight(.semibold))
                     Spacer()
                     if d.isCalibrating {
-                        Text("CALIBRATING").font(.caption2.weight(.bold)).tracking(1)
+                        Text("Calibrating").font(.caption2.weight(.bold))
                             .padding(.horizontal, 8).padding(.vertical, 4)
                             .glassEffect(.regular.tint(Theme.yellow.opacity(0.3)), in: .capsule)
                     }
@@ -143,8 +164,8 @@ struct TodayView: View {
                                 .frame(width: 26, height: 26)
                                 .background((inRange == health.count ? Theme.green : Theme.yellow).opacity(0.25), in: .rect(cornerRadius: 7))
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(inRange == health.count ? "WITHIN RANGE" : "OUT OF RANGE")
-                                    .font(.caption.weight(.bold)).tracking(0.8)
+                                Text(inRange == health.count ? "Within range" : "Out of range")
+                                    .font(.caption.weight(.bold))
                                     .foregroundStyle(inRange == health.count ? Theme.green : Theme.yellow)
                                 Text("\(inRange)/\(health.count) metrics").font(.caption).foregroundStyle(.secondary)
                             }
@@ -162,8 +183,8 @@ struct TodayView: View {
                                 .frame(width: 34, height: 26)
                                 .background(Theme.stressColor(stress ?? 0).opacity(0.25), in: .rect(cornerRadius: 7))
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(stress.map { StressLevel($0).rawValue.uppercased() } ?? "NO DATA")
-                                    .font(.caption.weight(.bold)).tracking(0.8)
+                                Text(stress.map { StressLevel($0).rawValue } ?? "No data")
+                                    .font(.caption.weight(.bold))
                                     .foregroundStyle(Theme.stressColor(stress ?? 0))
                                 Text(d.stress.last?.date.shortTime ?? "—").font(.caption).foregroundStyle(.secondary)
                             }
@@ -200,7 +221,7 @@ struct TodayView: View {
     }
 
     private func tonight(_ d: DayScores) -> some View {
-        let need = ScoreEngine.sleepNeed(profile: store.profile, previousStrain: d.strain, recent: store.window(3))
+        let need = ScoreEngine.sleepNeed(profile: store.profile, previousStrain: d.strain, debt: d.sleepDebt)
         let bedtime = ScoreEngine.recommendedBedtime(days: store.days, need: need)
         return GlassCard {
             VStack(alignment: .leading, spacing: 14) {
@@ -209,13 +230,13 @@ struct TodayView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Label(bedtime?.shortTime ?? "–", systemImage: "moon.zzz")
                             .font(.system(.title, design: .rounded).weight(.semibold))
-                        Text("RECOMMENDED BEDTIME").font(.caption2.weight(.semibold)).tracking(1).foregroundStyle(.secondary)
+                        Text("Recommended bedtime").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
                     }
                     Spacer()
                     VStack(alignment: .trailing, spacing: 4) {
                         Text(need.hoursMinutes)
                             .font(.system(.title, design: .rounded).weight(.semibold))
-                        Text("SLEEP NEEDED").font(.caption2.weight(.semibold)).tracking(1).foregroundStyle(Theme.sleep[0])
+                        Text("Sleep needed").font(.caption2.weight(.semibold)).foregroundStyle(Theme.sleep[0])
                     }
                 }
             }
@@ -310,7 +331,7 @@ struct RingTile: View {
             }
             .frame(width: 96, height: 96)
             HStack(spacing: 3) {
-                Text(title.uppercased()).font(.caption.weight(.bold)).tracking(1.3)
+                Text(title).font(.caption.weight(.bold))
                 Image(systemName: "chevron.right").font(.system(size: 8, weight: .bold)).foregroundStyle(.secondary)
             }
         }
@@ -336,7 +357,7 @@ struct ActivityRow: View {
             .font(.callout.weight(.bold))
             .frame(width: 92, height: 40)
             .background(tint.opacity(0.35), in: .rect(cornerRadius: 12))
-            Text(title.uppercased()).font(.subheadline.weight(.semibold)).tracking(1)
+            Text(title).font(.subheadline.weight(.semibold))
             Spacer()
             Text(detail).font(.caption).foregroundStyle(.secondary)
         }
@@ -401,7 +422,7 @@ struct HealthMonitorView: View {
                             HStack(spacing: 12) {
                                 Image(systemName: m.symbol).frame(width: 26).foregroundStyle(.secondary)
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(m.name.uppercased()).font(.footnote.weight(.semibold)).tracking(1)
+                                    Text(m.name).font(.footnote.weight(.semibold))
                                     Text("Your range \(m.range)").font(.caption).foregroundStyle(.secondary)
                                 }
                                 Spacer()

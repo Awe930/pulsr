@@ -123,7 +123,7 @@ struct SleepDetailView: View {
                                     VStack(spacing: 2) {
                                         Text((stage == .core ? sleep.duration(of: .core) + sleep.duration(of: .asleep) : sleep.duration(of: stage)).hoursMinutes)
                                             .font(.system(.callout, design: .rounded).weight(.semibold))
-                                        Text(stage.title.uppercased()).font(.caption2.weight(.semibold)).tracking(1).foregroundStyle(stageColor(stage))
+                                        Text(stage.title).font(.caption2.weight(.semibold)).foregroundStyle(stageColor(stage))
                                     }
                                     .frame(maxWidth: .infinity)
                                 }
@@ -338,7 +338,7 @@ struct StrainRecoveryChart: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("STRAIN · 0–21").font(.system(size: 9.5, weight: .medium, design: .monospaced)).tracking(1.2).foregroundStyle(.secondary)
+            Text("Strain · 0–21").font(.system(size: 9.5, weight: .medium)).foregroundStyle(.secondary)
             Chart(days) { d in
                 BarMark(x: .value("Day", d.date, unit: .day), y: .value("Strain", d.strain), width: .ratio(0.55))
                     .foregroundStyle(Theme.strain[0].opacity(d.id == days.last?.id ? 1 : 0.5))
@@ -348,7 +348,7 @@ struct StrainRecoveryChart: View {
             .chartYAxis { AxisMarks(values: [0, 7, 14, 21]) { _ in AxisGridLine().foregroundStyle(Theme.track); AxisValueLabel() } }
             .chartXAxis { xAxis }
             .frame(maxHeight: .infinity)
-            Text("RECOVERY · 0–100%").font(.system(size: 9.5, weight: .medium, design: .monospaced)).tracking(1.2).foregroundStyle(.secondary)
+            Text("Recovery · 0–100%").font(.system(size: 9.5, weight: .medium)).foregroundStyle(.secondary)
             Chart(days.filter { $0.recovery != nil }) { d in
                 let r = d.recovery ?? 0
                 LineMark(x: .value("Day", d.date, unit: .day), y: .value("Recovery", r))

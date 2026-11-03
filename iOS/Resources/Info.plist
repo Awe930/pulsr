@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Pulsr</string>
+	<string>Nine30</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -21,9 +21,9 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Pulsr reads heart rate, HRV, sleep, respiratory rate, workouts and steps recorded by your Apple Watch to calculate your Recovery, Strain and Sleep scores. Everything stays on your device.</string>
+	<string>Nine30 reads heart rate, HRV, sleep, respiratory rate, workouts and steps recorded by your Apple Watch to calculate your Recovery, Strain and Sleep scores. Everything stays on your device.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Pulsr does not write any data to Apple Health.</string>
+	<string>Nine30 does not write any data to Apple Health.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

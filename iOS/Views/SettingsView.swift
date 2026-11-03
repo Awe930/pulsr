@@ -40,14 +40,14 @@ struct SettingsView: View {
                 } header: {
                     Text("Data")
                 } footer: {
-                    Text("To change individual permissions open Settings → Health → Data Access & Devices → Pulsr.")
+                    Text("To change individual permissions open Settings → Health → Data Access & Devices → Nine30.")
                 }
                 Section("About") {
                     Link(destination: URL(string: "https://github.com/0xCodez/pulsr")!) {
                         Label("Source code on GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
                     }
                     LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "–")
-                    Text("Pulsr is not a medical device. Scores are estimates for wellness purposes only.")
+                    Text("Nine30 is not a medical device. Scores are estimates for wellness purposes only.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }

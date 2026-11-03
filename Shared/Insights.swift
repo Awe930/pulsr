@@ -16,11 +16,14 @@ enum Insights {
         let target = ScoreEngine.strainTarget(recovery: recovery)
         let targetText = "\(Int(target.lowerBound))–\(Int(target.upperBound))"
         var hrvText = ""
-        if let change = hrvChange(d) {
+        if let trend = d.hrvTrend, let range = d.hrvRange, let status = d.hrvStatus {
+            let where_ = status == .typical ? "inside" : status == .below ? "below" : "above"
+            hrvText = "Your 7-day HRV is \(Int(trend.rounded())) ms, \(where_) your range (\(Int(range.lowerBound.rounded()))–\(Int(range.upperBound.rounded()))). "
+        } else if let change = hrvChange(d) {
             let pct = Int(abs(change * 100).rounded())
             hrvText = change >= 0 ? "Your HRV is \(pct)% above your baseline. " : "Your HRV is \(pct)% below your baseline. "
         }
-        let calibrating = d.isCalibrating ? " Pulsr is still learning your baseline, so expect scores to settle over the first week." : ""
+        let calibrating = d.isCalibrating ? " Nine30 is still learning your baseline, so expect scores to settle over the first week." : ""
         switch RecoveryZone(recovery) {
         case .green:
             return ("Primed to perform", hrvText + "Your body can take on significant exertion — aim for a Strain of \(targetText)." + calibrating)
