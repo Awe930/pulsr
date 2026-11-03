@@ -164,8 +164,12 @@ struct DayScores: Hashable, Identifiable {
     var hrvRange: ClosedRange<Double>?
 
     // Sleep
-    /// Running sleep debt over the last 14 nights, recent nights weighted more. Extra sleep pays it back.
-    var sleepDebt: TimeInterval = 0
+    /// Sleep balance over the last 14 nights against your goal, recent nights weighted more.
+    /// Positive = surplus (capped at +3 h), negative = debt.
+    var sleepBalance: TimeInterval = 0
+    var sleepDebt: TimeInterval { max(0, -sleepBalance) }
+    /// Within ±30 min of balanced counts as on target (smaller swings are mostly watch noise).
+    var sleepOnTarget: Bool { abs(sleepBalance) < 30 * 60 }
     var sleepPerformance: Double?
     var sleepNeed: TimeInterval = 8 * 3600
     var hoursVsNeeded: Double?

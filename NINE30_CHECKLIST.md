@@ -44,3 +44,8 @@ Running list for PAK's personal build of Pulsr. Updated with every push.
 - [x] 30-day Avg Strain was diluted by days with no heart-rate data (only 14 days loaded); now loads 35 days and skips empty days
 - [x] Confidence "high" now needs 5+ HRV readings (3 readings showed as high)
 - [x] Confidence bars use the zone colour (were hard to see on light glass)
+
+## Stage 2a · Sleep balance and appearance (Nov 3)
+- [x] Sleep balance against the 7 h goal: debt, "On target" (±30 min) or surplus (capped at +3 h); debt raises tonight's need, surplus never lowers it
+- [x] Appearance setting: Match phone / Light / Dark (Settings, top section)
+- [x] Confidence chip shortened to one line ("3 readings · 30 nights")

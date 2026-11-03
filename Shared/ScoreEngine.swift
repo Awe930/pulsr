@@ -39,7 +39,7 @@ enum ScoreEngine {
 
             let previous = result.last
             s.sleepNeed = sleepNeed(profile: profile, previousStrain: previous?.strain, debt: previous?.sleepDebt ?? 0)
-            s.sleepDebt = sleepDebt(days[max(0, i - 13)...i].map(\.sleep), goalHours: profile.sleepGoalHours)
+            s.sleepBalance = sleepBalance(days[max(0, i - 13)...i].map(\.sleep), goalHours: profile.sleepGoalHours)
             if let sleep = raw.sleep {
                 let priorSleeps = history.suffix(4).compactMap(\.sleep)
                 s.hoursVsNeeded = min(1, sleep.asleep / s.sleepNeed)
@@ -109,8 +109,8 @@ enum ScoreEngine {
         points += hrvNights >= 21 ? 2 : hrvNights >= calibrationNights ? 1 : 0
         points += hasTrend ? 1 : 0
         let level: ScoreConfidence = points >= 5 ? .high : points >= 3 ? .medium : .low
-        let readings = raw.hrvSampleCount == 1 ? "1 HRV reading" : "\(raw.hrvSampleCount) HRV readings"
-        return (level, "\(readings) · \(hrvNights)-night baseline")
+        let readings = raw.hrvSampleCount == 1 ? "1 reading" : "\(raw.hrvSampleCount) readings"
+        return (level, "\(readings) · \(hrvNights) nights")
     }
 
     // MARK: Strain (0–21)
@@ -196,18 +196,21 @@ enum ScoreEngine {
         return hours * 3600
     }
 
-    /// Sleep debt over the last 14 nights (oldest first, tonight last), measured against your goal so it cannot compound.
-    /// Recent nights weigh more: last night counts fully, two weeks ago about 1/14. Nights above goal pay debt back.
-    static func sleepDebt(_ nights: [SleepSession?], goalHours: Double) -> TimeInterval {
+    static let maxSleepSurplus: TimeInterval = 3 * 3600
+
+    /// Sleep balance over the last 14 nights (oldest first, last night last), measured against your goal so it cannot compound.
+    /// Recent nights weigh more: last night counts fully, two weeks ago about 1/14.
+    /// Above goal adds surplus, below goal adds debt. Surplus is capped: banked sleep helps, but not without limit.
+    static func sleepBalance(_ nights: [SleepSession?], goalHours: Double) -> TimeInterval {
         let n = nights.count
         guard n > 0 else { return 0 }
-        var debt = 0.0
+        var balance = 0.0
         for (i, night) in nights.enumerated() {
             guard let slept = night?.asleep else { continue }   // a night without data neither adds nor repays
             let weight = Double(14 - (n - 1 - i)) / 14
-            debt += weight * (goalHours * 3600 - slept)
+            balance += weight * (slept - goalHours * 3600)
         }
-        return max(0, debt)
+        return min(balance, maxSleepSurplus)
     }
 
     /// 1 = went to bed and woke up at exactly the same times as the previous nights.

@@ -111,9 +111,12 @@ struct TodayView: View {
             GlassEffectContainer(spacing: 10) {
                 HStack(spacing: 10) {
                     NavigationLink(value: Route.sleep) {
-                        // Sleep debt is the headline sleep number; the ring fills as debt grows (full at 10 h).
-                        MetricCapsule(progress: d.sleepDebt / (10 * 3600), color: Theme.sleep[0],
-                                      value: String(format: "%.1f h", d.sleepDebt / 3600), title: "Sleep debt")
+                        // Sleep balance against your goal: debt (purple), on target, or surplus (blue). Ring is full at 3 h either way.
+                        let hours = d.sleepBalance / 3600
+                        MetricCapsule(progress: min(abs(hours) / 3, 1),
+                                      color: hours < 0 ? Theme.sleep[0] : Theme.strain[0],
+                                      value: d.sleepOnTarget ? "On target" : "\(hours < 0 ? "−" : "+")\(String(format: "%.1f", abs(hours))) h",
+                                      title: d.sleepOnTarget ? "Sleep balance" : hours < 0 ? "Sleep debt" : "Sleep surplus")
                     }
                     NavigationLink(value: Route.strain) {
                         let target = ScoreEngine.strainTarget(recovery: d.recovery)

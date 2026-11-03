@@ -80,8 +80,10 @@ Strain target by recovery: green 14–18, yellow 10–14, red 4–10.
 ## Sleep
 
 ```
-debt = max(0, Σ over last 14 nights of  w · (goal − asleep))      w = 1 for last night … 1/14 two weeks ago
-       nights above goal pay debt back; nights with no data are skipped            (Nine30)
+balance = min(+3 h, Σ over last 14 nights of  w · (asleep − goal))   w = 1 for last night … 1/14 two weeks ago
+          positive = surplus, negative = debt; nights with no data are skipped        (Nine30)
+          |balance| < 30 min shows as "On target"
+debt    = max(0, −balance)
 
 need = goal (default 7 h 45)
      + 0.06 h × (yesterday's strain − 10)              if strain > 10

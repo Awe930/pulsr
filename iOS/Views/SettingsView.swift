@@ -5,10 +5,17 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft = UserProfile()
     @State private var customMaxHR = false
+    @AppStorage(Appearance.storageKey) private var appearance = Appearance.system.rawValue
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("Appearance") {
+                    Picker("Appearance", selection: $appearance) {
+                        ForEach(Appearance.allCases) { Text($0.title).tag($0.rawValue) }
+                    }
+                    .pickerStyle(.segmented)
+                }
                 Section("Profile") {
                     TextField("Name", text: $draft.name)
                     Stepper("Age: \(draft.age)", value: $draft.age, in: 14...99)
