@@ -108,7 +108,7 @@ enum ScoreEngine {
         points += raw.hrvSampleCount >= 5 ? 2 : raw.hrvSampleCount >= 3 ? 1 : 0
         points += hrvNights >= 21 ? 2 : hrvNights >= calibrationNights ? 1 : 0
         points += hasTrend ? 1 : 0
-        let level: ScoreConfidence = points >= 4 ? .high : points >= 2 ? .medium : .low
+        let level: ScoreConfidence = points >= 5 ? .high : points >= 3 ? .medium : .low
         let readings = raw.hrvSampleCount == 1 ? "1 HRV reading" : "\(raw.hrvSampleCount) HRV readings"
         return (level, "\(readings) · \(hrvNights)-night baseline")
     }

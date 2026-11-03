@@ -71,13 +71,14 @@ struct Eyebrow: View {
 struct ConfidenceChip: View {
     var level: ScoreConfidence
     var detail: String
+    var tint: Color = .primary
 
     var body: some View {
         HStack(spacing: 8) {
             HStack(spacing: 3) {
                 ForEach(1...3, id: \.self) { i in
                     Capsule()
-                        .fill(i <= level.rawValue ? Color.primary : Color.primary.opacity(0.2))
+                        .fill(i <= level.rawValue ? tint : Color.secondary.opacity(0.3))
                         .frame(width: 10, height: 5)
                 }
             }

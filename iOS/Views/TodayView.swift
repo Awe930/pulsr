@@ -101,7 +101,7 @@ struct TodayView: View {
                          + Text(Insights.headline(d).title).foregroundStyle(Theme.recoveryColor(d.recovery)).fontWeight(.semibold))
                             .font(.subheadline)
                             .padding(.top, 8)
-                        ConfidenceChip(level: d.confidence, detail: d.confidenceDetail)
+                        ConfidenceChip(level: d.confidence, detail: d.confidenceDetail, tint: Theme.recoveryColor(d.recovery))
                             .padding(.top, 10)
                     }
                 }

@@ -39,3 +39,8 @@ Running list for PAK's personal build of Pulsr. Updated with every push.
 - [ ] Resilience (14-day balance)
 - [ ] "Followed the plan" streak
 - [ ] Timed nudges (caffeine cutoff, light, wind-down)
+
+## Fixes from first live run (Nov 3)
+- [x] 30-day Avg Strain was diluted by days with no heart-rate data (only 14 days loaded); now loads 35 days and skips empty days
+- [x] Confidence "high" now needs 5+ HRV readings (3 readings showed as high)
+- [x] Confidence bars use the zone colour (were hard to see on light glass)

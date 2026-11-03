@@ -93,7 +93,7 @@ struct TrendsView: View {
     private func averages(_ days: [DayScores]) -> some View {
         func avg(_ values: [Double]) -> Double? { values.isEmpty ? nil : values.reduce(0, +) / Double(values.count) }
         let rec = avg(days.compactMap(\.recovery))
-        let strain = avg(days.map(\.strain))
+        let strain = avg(days.filter { !$0.raw.heartRate.isEmpty }.map(\.strain))   // days without heart rate would count as 0
         let sleep = avg(days.compactMap { $0.raw.sleep?.asleep })
         return GlassEffectContainer(spacing: 10) {
             HStack(spacing: 10) {

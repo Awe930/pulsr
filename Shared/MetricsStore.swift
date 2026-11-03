@@ -31,7 +31,7 @@ final class MetricsStore {
     private let historyDays: Int
     private let detailedDays: Int
 
-    init(historyDays: Int = 60, detailedDays: Int = 14) {
+    init(historyDays: Int = 60, detailedDays: Int = 35) {
         self.historyDays = historyDays
         self.detailedDays = detailedDays
         profile = UserProfile.load()

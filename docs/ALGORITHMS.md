@@ -46,7 +46,7 @@ The trend, not a single night, decides whether HRV is typical (the approach used
 points = 2 if ≥ 5 HRV readings last night, 1 if ≥ 3
        + 2 if ≥ 21 nights of baseline, 1 if ≥ 7
        + 1 if a 7-day trend exists
-high ≥ 4 · medium ≥ 2 · low otherwise (and always low with no HRV last night)
+high = 5 · medium ≥ 3 · low otherwise (and always low with no HRV last night)
 ```
 
 ## Recovery (0–100 %)
