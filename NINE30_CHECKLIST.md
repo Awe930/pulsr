@@ -12,7 +12,7 @@ Running list for PAK's personal build of Pulsr. Updated with every push.
 - [x] 7-day HRV trend and normal range; Recovery blends last night with the trend
 - [x] 14-night weighted sleep debt as the headline sleep number
 - [x] Strain shown out of 21 with today's target
-- [ ] New app icon (9:30 + zone ring)
+- [x] New app icon (9:30 + gold ring; iOS can't recolour it daily without a pop-up, so it stays static)
 - [ ] First build on PAK's iPhone and watch (needs Xcode run)
 
 ## Stage 2 · Daily use
