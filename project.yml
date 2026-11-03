@@ -21,8 +21,7 @@ targets:
     sources:
       - path: Shared
       - path: iOS
-    dependencies:
-      - target: PulsrWatch
+    # Watch app unhooked for now (stage 1): the iPhone app builds alone. Re-add in stage 4.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(BUNDLE_ID_PREFIX).nine30
@@ -75,6 +74,5 @@ schemes:
     build:
       targets:
         Pulsr: all
-        PulsrWatch: all
     run:
       config: Debug

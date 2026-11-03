@@ -13,7 +13,7 @@ Running list for PAK's personal build of Pulsr. Updated with every push.
 - [x] 14-night weighted sleep debt as the headline sleep number
 - [x] Strain shown out of 21 with today's target
 - [x] New app icon (9:30 + gold ring; iOS can't recolour it daily without a pop-up, so it stays static)
-- [ ] First build on PAK's iPhone and watch (needs Xcode run)
+- [ ] First build on PAK's iPhone (watch app unhooked until the watch is registered; re-link in stage 4)
 
 ## Stage 2 · Daily use
 - [ ] Morning check-in: 60 s HRV (RMSSD from heartbeat series), readiness 1–5, tags

@@ -21,20 +21,6 @@
                ReferencedContainer = "container:Pulsr.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "YES"
-            buildForProfiling = "YES"
-            buildForArchiving = "YES"
-            buildForAnalyzing = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "9D3AF1821A373BF30B88261E"
-               BuildableName = "PulsrWatch.app"
-               BlueprintName = "PulsrWatch"
-               ReferencedContainer = "container:Pulsr.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction

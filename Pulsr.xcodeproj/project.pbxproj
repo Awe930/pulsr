@@ -57,7 +57,6 @@
 			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
 			dstSubfolderSpec = 16;
 			files = (
-				40384C854CCDF81EA1D1A136 /* PulsrWatch.app in Embed Watch Content */,
 			);
 			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -228,7 +227,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				5FC3716A2206F7D0382143C0 /* PBXTargetDependency */,
 			);
 			name = Pulsr;
 			packageProductDependencies = (
