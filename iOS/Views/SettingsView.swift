@@ -25,6 +25,9 @@ struct SettingsView: View {
                 }
                 Section {
                     Stepper("Sleep goal: \(TimeInterval(draft.sleepGoalHours * 3600).hoursMinutes)", value: $draft.sleepGoalHours, in: 6...10, step: 0.25)
+                    Picker("HRV method", selection: $draft.hrvMethod) {
+                        ForEach(HRVMethod.allCases) { Text($0.title).tag($0) }
+                    }
                     Toggle("Custom max heart rate", isOn: $customMaxHR)
                     if customMaxHR {
                         Stepper("Max HR: \(draft.maxHeartRateOverride ?? 190) bpm",
@@ -36,7 +39,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Scoring")
                 } footer: {
-                    Text("Max heart rate sets your heart-rate zones. If you know yours from a test or race, enter it for more accurate Strain.")
+                    Text("HRV method: Morning check-in uses your 1-minute Breathe reading (RMSSD) once you have 7 mornings, and falls back to overnight readings on days you skip it. Overnight uses the readings the watch takes while you sleep (SDNN). Max heart rate sets your heart-rate zones; enter yours if you know it from a test or race.")
                 }
                 Section {
                     Picker("Data source", selection: Binding(get: { store.source }, set: { store.source = $0 })) {

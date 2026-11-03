@@ -15,12 +15,12 @@ Running list for PAK's personal build of Pulsr. Updated with every push.
 - [x] New app icon (9:30 + gold ring; iOS can't recolour it daily without a pop-up, so it stays static)
 - [x] First build on PAK's iPhone, Nov 3 (built on the 2019 MacBook Pro with Xcode 26.6; watch app unhooked until stage 4)
 
-## Stage 2 · Daily use
-- [ ] Morning check-in: 60 s HRV (RMSSD from heartbeat series), readiness 1–5, tags
-- [ ] Body check: alert when 2+ vitals are out of range
-- [ ] Range bands on every vital (Typical / Outlier)
-- [ ] Status switch: Normal / Sick / Travel (sick and travel days stay out of baselines)
-- [ ] HRV method setting: morning RMSSD / Apple overnight / SDNN
+## Stage 2 · Daily use (pushed Nov 3, needs first build)
+- [x] Morning check-in: 60 s HRV (RMSSD from a Breathe session's heartbeat series), readiness 1–5, day status; tags stay in the Journal
+- [x] Body check: alert when 2+ vitals are out of range
+- [x] Range bars on every vital in Body check
+- [x] Status switch in the check-in: Normal / Sick / Travel (left out of baselines; sick = strain 0–8)
+- [x] HRV method setting: Morning check-in (RMSSD, default) / Overnight (Apple SDNN)
 
 ## Stage 3 · Deeper views
 - [ ] Focus windows vs market hours (energy schedule from sleep timing)
@@ -49,3 +49,4 @@ Running list for PAK's personal build of Pulsr. Updated with every push.
 - [x] Sleep balance against the 7 h goal: debt, "On target" (±30 min) or surplus (capped at +3 h); debt raises tonight's need, surplus never lowers it
 - [x] Appearance setting: Match phone / Light / Dark (Settings, top section)
 - [x] Confidence chip shortened to one line ("3 readings · 30 nights")
+- [x] Journal: Trading day and Big loss day tags

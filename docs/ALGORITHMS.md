@@ -120,3 +120,26 @@ Total is capped at ±12 years. This is a motivational estimate, not a clinical b
 ## Journal impact
 
 For each behavior: mean next-day recovery after "yes" days vs. "no" days, as a percentage change. Needs at least 3 of each.
+
+## Morning check-in and HRV method (Nine30)
+
+A 1-minute Breathe session on the watch records beat-to-beat data. Nine30 reads the latest series from the last 3 hours:
+
+```
+RR intervals from beat times; drop RR outside 300–2000 ms and jumps > 20% from the previous beat (artifacts)
+RMSSD = √ mean( (RRᵢ − RRᵢ₋₁)² )        needs ≥ 30 clean differences
+```
+
+HRV method **Morning check-in** (default): Recovery's HRV term is the z-score of ln(morning RMSSD) against your
+morning baseline, once 7 mornings exist. On days without a reading it falls back to overnight SDNN (last night + 7-day trend).
+Z-scores are unitless, so both feed the same Recovery formula. A morning reading counts as 2 confidence points.
+
+## Day status (Nine30)
+
+Days marked **Sick** or **Travel** at check-in are left out of every baseline (HRV, RHR, respiration, temperature, RMSSD).
+Sick days set the strain target to 0–8. Readiness (1–5) is stored for fitting the Recovery weights after 4–6 weeks.
+
+## Body check (Nine30)
+
+Each vital is compared with your ±2 SD normal range. Two or more out of range at once shows the Body check alert
+(the Apple Vitals rule: one odd reading is noise).

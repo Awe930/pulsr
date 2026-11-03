@@ -7,6 +7,7 @@ final class DemoSource: HealthDataSource {
 
     func requestAuthorization() async throws {}
     func profileHints() -> (age: Int?, sex: Sex?) { (31, .male) }
+    func latestMorningRMSSD(since: Date) async throws -> (rmssd: Double, beats: Int)? { (52, 71) }
 
     func loadDays(count: Int, detailedDays: Int) async throws -> [RawDay] {
         let today = cal.startOfDay(for: .now)

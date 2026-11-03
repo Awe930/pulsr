@@ -9,6 +9,8 @@ final class MetricsStore {
     private(set) var days: [DayScores] = []
     private(set) var bodyAge: BodyAgeResult?
     private(set) var isLoading = false
+    /// Check-ins: readiness, morning HRV and day status, keyed by "yyyy-MM-dd".
+    private(set) var logs: [String: DayLog] = DayLogStore.load()
     private(set) var errorMessage: String?
     var selectedIndex = 0
 
@@ -84,9 +86,25 @@ final class MetricsStore {
 
     private func rescore() {
         guard !rawDays.isEmpty else { return }
-        days = ScoreEngine.score(rawDays, profile: profile)
+        days = ScoreEngine.score(rawDays, profile: profile, logs: logs)
         bodyAge = ScoreEngine.bodyAge(days: days, profile: profile)
         selectedIndex = min(selectedIndex, max(days.count - 1, 0))
+    }
+
+    func dayLog(for date: Date) -> DayLog { logs[DayLogStore.dayKey(date)] ?? DayLog() }
+
+    func updateDayLog(for date: Date, _ change: (inout DayLog) -> Void) {
+        var entry = dayLog(for: date)
+        change(&entry)
+        logs[DayLogStore.dayKey(date)] = entry
+        DayLogStore.save(logs)
+        rescore()
+    }
+
+    /// Reads the latest Breathe session from the last 3 hours. Asks Health for beat-to-beat access the first time.
+    func readMorningHRV() async -> (rmssd: Double, beats: Int)? {
+        try? await dataSource.requestAuthorization()
+        return try? await dataSource.latestMorningRMSSD(since: Date().addingTimeInterval(-3 * 3600))
     }
 
     func step(_ delta: Int) {

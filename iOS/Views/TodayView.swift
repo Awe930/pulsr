@@ -4,6 +4,7 @@ import Charts
 struct TodayView: View {
     @Environment(MetricsStore.self) private var store
     @State private var showSettings = false
+    @State private var showCheckIn = false
 
     var body: some View {
         let day = store.selected
@@ -12,7 +13,9 @@ struct TodayView: View {
                 header
                 if let day {
                     rings(day)
+                    bodyCheckAlert(day)
                     insight(day)
+                    if store.isToday { checkInCard(day) }
                     monitors(day)
                     SectionTitle(title: "My Day")
                     activities(day)
@@ -33,6 +36,7 @@ struct TodayView: View {
         .background { AuroraBackground(accent: Theme.recoveryColor(day?.recovery)) }
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(isPresented: $showCheckIn) { CheckInView() }
     }
 
     // MARK: Header
@@ -119,7 +123,7 @@ struct TodayView: View {
                                       title: d.sleepOnTarget ? "Sleep balance" : hours < 0 ? "Sleep debt" : "Sleep surplus")
                     }
                     NavigationLink(value: Route.strain) {
-                        let target = ScoreEngine.strainTarget(recovery: d.recovery)
+                        let target = ScoreEngine.strainTarget(for: d)
                         MetricCapsule(progress: d.strain / 21, color: Theme.strain[0], value: "\(d.strain.oneDecimal)/21",
                                       title: "Strain · aim \(Int(target.lowerBound))–\(Int(target.upperBound))")
                     }
@@ -152,6 +156,50 @@ struct TodayView: View {
         }
     }
 
+    /// Apple-Vitals-style rule: one odd vital is noise, two or more at once is worth a look.
+    @ViewBuilder private func bodyCheckAlert(_ d: DayScores) -> some View {
+        let out = HealthMonitor.metrics(for: d).filter { !$0.inRange }
+        if out.count >= 2 {
+            NavigationLink(value: Route.healthMonitor) {
+                GlassCard(tint: Theme.hurts) {
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.hurts)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Body check: \(out.count) vitals out of range").font(.headline)
+                            Text(out.map(\.name).joined(separator: ", ") + ". Two or more at once can be an early sign of illness, overreach or a poor night. Consider an easier day.")
+                                .font(.callout).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func checkInCard(_ d: DayScores) -> some View {
+        let entry = store.dayLog(for: d.date)
+        let status = entry.status ?? .normal
+        let candidates: [String?] = [
+            entry.readiness.map { "felt \($0) of 5" },
+            entry.morningRMSSD.map { "HRV \(Int($0.rounded())) ms" },
+            status == .normal ? nil : status.title,
+        ]
+        let parts = candidates.compactMap { $0 }
+        let detail = entry.checkedInAt.map { "Done at \($0.shortTime)" + (parts.isEmpty ? "" : " · " + parts.joined(separator: " · ")) }
+            ?? "Not done yet · about 2 minutes"
+        return GlassCard(padding: 16) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Morning check-in").font(.headline)
+                    Text(detail).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button(entry.checkedInAt == nil ? "Start" : "Redo") { showCheckIn = true }
+                    .buttonStyle(.glass)
+            }
+        }
+    }
+
     private func monitors(_ d: DayScores) -> some View {
         let health = HealthMonitor.metrics(for: d)
         let inRange = health.filter(\.inRange).count
@@ -160,17 +208,17 @@ struct TodayView: View {
             NavigationLink(value: Route.healthMonitor) {
                 GlassCard(padding: 16) {
                     VStack(alignment: .leading, spacing: 12) {
-                        HStack { Eyebrow(text: "Health Monitor"); Spacer(); Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary) }
+                        HStack { Eyebrow(text: "Body check"); Spacer(); Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary) }
                         HStack(spacing: 10) {
                             Image(systemName: inRange == health.count ? "checkmark" : "exclamationmark")
                                 .font(.caption.weight(.bold))
                                 .frame(width: 26, height: 26)
                                 .background((inRange == health.count ? Theme.green : Theme.yellow).opacity(0.25), in: .rect(cornerRadius: 7))
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(inRange == health.count ? "Within range" : "Out of range")
+                                Text(inRange == health.count ? "All typical" : "\(health.count - inRange) out of range")
                                     .font(.caption.weight(.bold))
                                     .foregroundStyle(inRange == health.count ? Theme.green : Theme.yellow)
-                                Text("\(inRange)/\(health.count) metrics").font(.caption).foregroundStyle(.secondary)
+                                Text("\(inRange) of \(health.count) vitals").font(.caption).foregroundStyle(.secondary)
                             }
                         }
                     }
@@ -378,6 +426,9 @@ enum HealthMonitor {
         var value: String
         var range: String
         var inRange: Bool
+        var low: Double? = nil      // band edges and value, for the range bar
+        var high: Double? = nil
+        var raw: Double? = nil
     }
 
     static func metrics(for d: DayScores) -> [Metric] {
@@ -386,14 +437,14 @@ enum HealthMonitor {
             guard let value else { return }
             if let base {
                 let lo = base.mean - 2 * base.sd, hi = base.mean + 2 * base.sd
-                out.append(Metric(name: name, symbol: symbol, value: format(value), range: "\(format(lo))–\(format(hi))", inRange: (lo...hi).contains(value)))
+                out.append(Metric(name: name, symbol: symbol, value: format(value), range: "\(format(lo))–\(format(hi))", inRange: (lo...hi).contains(value), low: lo, high: hi, raw: value))
             } else {
                 out.append(Metric(name: name, symbol: symbol, value: format(value), range: "learning", inRange: true))
             }
         }
         if let hrv = d.raw.hrv, let b = d.hrvBaseline {
             let lo = exp(b.mean - 2 * b.sd), hi = exp(b.mean + 2 * b.sd)
-            out.append(Metric(name: "Heart Rate Variability", symbol: "waveform.path.ecg", value: "\(Int(hrv)) ms", range: "\(Int(lo))–\(Int(hi))", inRange: (lo...hi).contains(hrv)))
+            out.append(Metric(name: "Heart Rate Variability", symbol: "waveform.path.ecg", value: "\(Int(hrv)) ms", range: "\(Int(lo))–\(Int(hi))", inRange: (lo...hi).contains(hrv), low: lo, high: hi, raw: hrv))
         }
         add("Resting Heart Rate", "heart", d.raw.restingHR, d.rhrBaseline) { "\(Int($0.rounded()))" }
         add("Respiratory Rate", "lungs", d.raw.respiratoryRate, d.respBaseline) { $0.oneDecimal }
@@ -403,7 +454,7 @@ enum HealthMonitor {
         if let temp = d.raw.wristTemperature {
             if let b = d.tempBaseline {
                 let delta = temp - b.mean
-                out.append(Metric(name: "Skin Temperature", symbol: "thermometer.medium", value: String(format: "%+.1f°", delta), range: "±0.5°", inRange: abs(delta) <= 0.5))
+                out.append(Metric(name: "Skin Temperature", symbol: "thermometer.medium", value: String(format: "%+.1f°", delta), range: "±0.5°", inRange: abs(delta) <= 0.5, low: -0.5, high: 0.5, raw: delta))
             } else {
                 out.append(Metric(name: "Skin Temperature", symbol: "thermometer.medium", value: String(format: "%.1f°", temp), range: "learning", inRange: true))
             }
@@ -416,7 +467,7 @@ struct HealthMonitorView: View {
     @Environment(MetricsStore.self) private var store
 
     var body: some View {
-        DetailScaffold(title: "Health Monitor", accent: Theme.green) {
+        DetailScaffold(title: "Body check", accent: Theme.green) {
             if let d = store.selected {
                 let metrics = HealthMonitor.metrics(for: d)
                 GlassCard {
@@ -427,6 +478,11 @@ struct HealthMonitorView: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(m.name).font(.footnote.weight(.semibold))
                                     Text("Your range \(m.range)").font(.caption).foregroundStyle(.secondary)
+                                    if let lo = m.low, let hi = m.high, let v = m.raw {
+                                        RangeBar(low: lo, high: hi, value: v, inRange: m.inRange)
+                                            .frame(maxWidth: 150)
+                                            .padding(.top, 4)
+                                    }
                                 }
                                 Spacer()
                                 Text(m.value).font(.system(.title3, design: .rounded).weight(.semibold))
@@ -438,8 +494,151 @@ struct HealthMonitorView: View {
                         }
                     }
                 }
-                InsightCallout(text: "Ranges are your personal 30-day normal (±2 standard deviations). Several metrics out of range at once can be an early sign of illness, overtraining or poor sleep.")
+                InsightCallout(text: "Ranges are your personal 30-day normal (±2 standard deviations), leaving out days you marked sick or travel. Two or more vitals out of range at once brings up the Body check alert on Today.")
             }
+        }
+    }
+}
+
+/// Your value against your normal band (the middle half of the bar).
+struct RangeBar: View {
+    var low: Double
+    var high: Double
+    var value: Double
+    var inRange: Bool
+
+    var body: some View {
+        GeometryReader { geo in
+            let span = max(high - low, 0.0001)
+            let lo = low - span * 0.5, hi = high + span * 0.5
+            let x = ((value - lo) / (hi - lo)).clamped(0, 1) * geo.size.width
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.primary.opacity(0.08))
+                Capsule().fill(Color.primary.opacity(0.18))
+                    .frame(width: geo.size.width * 0.5)
+                    .offset(x: geo.size.width * 0.25)
+                Circle().fill(inRange ? Color.primary : Theme.hurts)
+                    .frame(width: 10, height: 10)
+                    .offset(x: x - 5)
+            }
+        }
+        .frame(height: 10)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Morning check-in: a 1-minute HRV read from a Breathe session on the watch, how ready you feel, and today's status.
+struct CheckInView: View {
+    @Environment(MetricsStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
+    @State private var readiness: Int?
+    @State private var status: DayStatus = .normal
+    @State private var rmssd: Double?
+    @State private var beats: Int?
+    @State private var reading = false
+    @State private var readError: String?
+    private let words = ["Drained", "Low", "Okay", "Good", "Sharp"]
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text("Sit still and run a 1-minute Breathe session in the Mindfulness app on your watch. Then read it here.")
+                        .font(.callout).foregroundStyle(.secondary)
+                    Button {
+                        Task { await read() }
+                    } label: {
+                        HStack {
+                            Label(reading ? "Reading…" : "Read morning HRV", systemImage: "waveform.path.ecg")
+                            Spacer()
+                            if let rmssd {
+                                Text("\(Int(rmssd.rounded())) ms").monospacedDigit().foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .disabled(reading)
+                    if let beats, rmssd != nil {
+                        Text("From \(beats) clean beats").font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let readError {
+                        Text(readError).font(.caption).foregroundStyle(Theme.hurts)
+                    }
+                } header: {
+                    Text("Morning HRV")
+                }
+
+                Section("How ready do you feel?") {
+                    HStack(spacing: 6) {
+                        ForEach(1...5, id: \.self) { n in
+                            Button {
+                                readiness = n
+                            } label: {
+                                VStack(spacing: 2) {
+                                    Text("\(n)").font(.title3.weight(.semibold))
+                                    Text(words[n - 1]).font(.caption2)
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 50)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(readiness == n ? Color.primary : Color.secondary)
+                        }
+                    }
+                }
+
+                Section {
+                    Picker("Today", selection: $status) {
+                        ForEach(DayStatus.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("Today is")
+                } footer: {
+                    Text("Sick and travel days stay out of your normal ranges, so one rough day can't move your baseline. Tag yesterday's habits in the Journal tab.")
+                }
+            }
+            .navigationTitle("Morning check-in")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        save()
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .onAppear {
+            let entry = store.dayLog(for: .now)
+            readiness = entry.readiness
+            status = entry.status ?? .normal
+            rmssd = entry.morningRMSSD
+            beats = entry.morningBeats
+        }
+    }
+
+    private func read() async {
+        reading = true
+        readError = nil
+        defer { reading = false }
+        if let result = await store.readMorningHRV() {
+            rmssd = result.rmssd
+            beats = result.beats
+        } else {
+            readError = "No clean reading from the last 3 hours. Run a Breathe session on the watch, wait a minute for it to sync, then try again."
+        }
+    }
+
+    private func save() {
+        let r = readiness, st = status, hrv = rmssd, b = beats
+        store.updateDayLog(for: .now) { entry in
+            entry.readiness = r
+            entry.status = st
+            entry.morningRMSSD = hrv
+            entry.morningBeats = b
+            entry.checkedInAt = .now
         }
     }
 }

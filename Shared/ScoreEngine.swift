@@ -9,16 +9,27 @@ enum ScoreEngine {
     // MARK: Pipeline
 
     /// `days` must be sorted oldest → newest. Each day is scored against the days before it.
-    static func score(_ days: [RawDay], profile: UserProfile) -> [DayScores] {
+    static func score(_ input: [RawDay], profile: UserProfile, logs: [String: DayLog] = [:]) -> [DayScores] {
+        // Morning readings from check-ins join the raw data; sick and travel days are kept out of every baseline.
+        let days: [RawDay] = input.map { d in
+            var d = d
+            d.morningRMSSD = logs[DayLogStore.dayKey(d.date)]?.morningRMSSD
+            return d
+        }
+        let excluded: [Bool] = days.map { logs[DayLogStore.dayKey($0.date)]?.status?.excludedFromBaseline ?? false }
         var result: [DayScores] = []
         for (i, raw) in days.enumerated() {
-            let history = Array(days[max(0, i - baselineWindow)..<i])
+            let history = (max(0, i - baselineWindow)..<i).filter { !excluded[$0] }.map { days[$0] }
             var s = DayScores(raw: raw)
+            let dayLog = logs[DayLogStore.dayKey(raw.date)]
+            s.status = dayLog?.status ?? .normal
+            s.readiness = dayLog?.readiness
 
             s.hrvBaseline = baseline(history.compactMap(\.hrv).map { log($0) }, prior: Baseline(mean: log(45), sd: 0.30, samples: 0))
             s.rhrBaseline = baseline(history.compactMap(\.restingHR), prior: Baseline(mean: 60, sd: 5, samples: 0))
             s.respBaseline = baseline(history.compactMap(\.respiratoryRate), prior: Baseline(mean: 15, sd: 1, samples: 0))
             s.tempBaseline = baseline(history.compactMap(\.wristTemperature), prior: nil)
+            s.rmssdBaseline = baseline(history.compactMap(\.morningRMSSD).map { log($0) }, prior: Baseline(mean: log(42), sd: 0.35, samples: 0))
             s.isCalibrating = history.compactMap(\.hrv).count < calibrationNights
 
             // 7-day HRV trend against your range (Plews-style: the trend carries the verdict, one night does not).
@@ -50,8 +61,15 @@ enum ScoreEngine {
                                             + 0.2 * (s.sleepEfficiency ?? 0.85))
             }
 
-            s.recovery = recovery(raw: raw, hrvTrend: s.hrvTrend, hrvBase: s.hrvBaseline, rhrBase: s.rhrBaseline, respBase: s.respBaseline, sleepPerformance: s.sleepPerformance)
-            let trust = confidence(raw: raw, hrvNights: history.compactMap(\.hrv).count, hasTrend: s.hrvTrend != nil)
+            let rmssdNights = history.compactMap(\.morningRMSSD).count
+            let hrv = hrvZ(raw: raw, method: profile.hrvMethod, hrvTrend: s.hrvTrend, hrvBase: s.hrvBaseline,
+                           rmssdBase: s.rmssdBaseline, rmssdNights: rmssdNights)
+            s.hrvSource = hrv?.source
+            s.recovery = recovery(hrvZ: hrv?.z, raw: raw, rhrBase: s.rhrBaseline, respBase: s.respBaseline, sleepPerformance: s.sleepPerformance)
+            let usedMorning = hrv?.source == .morningRMSSD
+            let trust = confidence(raw: raw, usedMorning: usedMorning,
+                                   hrvNights: usedMorning ? rmssdNights : history.compactMap(\.hrv).count,
+                                   hasHRV: hrv != nil, hasTrend: s.hrvTrend != nil)
             s.confidence = trust.0
             s.confidenceDetail = trust.1
             s.stress = stress(heartRate: raw.heartRate, restingHR: raw.restingHR ?? s.rhrBaseline?.mean ?? 60,
@@ -81,12 +99,22 @@ enum ScoreEngine {
 
     // MARK: Recovery (0–100)
 
-    static func recovery(raw: RawDay, hrvTrend: Double?, hrvBase: Baseline?, rhrBase: Baseline?, respBase: Baseline?, sleepPerformance: Double?) -> Double? {
-        guard let hrv = raw.hrv, let hrvBase else { return nil }
-        // Half last night, half the 7-day trend: the score still reacts to a bad night, but one noisy reading can't flip the day.
-        var zHRV = hrvBase.z(log(hrv)).clamped(-3, 3)
-        if let hrvTrend { zHRV = 0.5 * zHRV + 0.5 * hrvBase.z(log(hrvTrend)).clamped(-3, 3) }
-        var composite = 0.55 * zHRV
+    /// The HRV part of Recovery as a z-score. Morning RMSSD is used when chosen, read today and backed by 7+ mornings;
+    /// otherwise overnight SDNN, half last night and half the 7-day trend. Z-scores are unitless, so both share one formula.
+    static func hrvZ(raw: RawDay, method: HRVMethod, hrvTrend: Double?, hrvBase: Baseline?,
+                     rmssdBase: Baseline?, rmssdNights: Int) -> (z: Double, source: HRVMethod)? {
+        if method == .morningRMSSD, let r = raw.morningRMSSD, let rb = rmssdBase, rmssdNights >= calibrationNights {
+            return (rb.z(log(r)).clamped(-3, 3), .morningRMSSD)
+        }
+        guard let hrv = raw.hrv, let base = hrvBase else { return nil }
+        var z = base.z(log(hrv)).clamped(-3, 3)
+        if let hrvTrend { z = 0.5 * z + 0.5 * base.z(log(hrvTrend)).clamped(-3, 3) }
+        return (z, .overnightSDNN)
+    }
+
+    static func recovery(hrvZ: Double?, raw: RawDay, rhrBase: Baseline?, respBase: Baseline?, sleepPerformance: Double?) -> Double? {
+        guard let hrvZ else { return nil }
+        var composite = 0.55 * hrvZ
         var weight = 0.55
         if let rhr = raw.restingHR, let rhrBase {
             composite += 0.25 * -rhrBase.z(rhr).clamped(-3, 3); weight += 0.25
@@ -102,15 +130,47 @@ enum ScoreEngine {
     }
 
     /// How much the day's Recovery can be trusted: readings last night, length of baseline, and whether a 7-day trend exists.
-    static func confidence(raw: RawDay, hrvNights: Int, hasTrend: Bool) -> (ScoreConfidence, String) {
-        guard raw.hrv != nil else { return (.low, "No HRV recorded last night") }
+    static func confidence(raw: RawDay, usedMorning: Bool, hrvNights: Int, hasHRV: Bool, hasTrend: Bool) -> (ScoreConfidence, String) {
+        guard hasHRV else { return (.low, "No HRV recorded last night") }
         var points = 0
-        points += raw.hrvSampleCount >= 5 ? 2 : raw.hrvSampleCount >= 3 ? 1 : 0
+        if usedMorning {
+            points += 2   // a 1-minute beat-to-beat reading at rest beats a few spot checks
+        } else {
+            points += raw.hrvSampleCount >= 5 ? 2 : raw.hrvSampleCount >= 3 ? 1 : 0
+        }
         points += hrvNights >= 21 ? 2 : hrvNights >= calibrationNights ? 1 : 0
         points += hasTrend ? 1 : 0
         let level: ScoreConfidence = points >= 5 ? .high : points >= 3 ? .medium : .low
-        let readings = raw.hrvSampleCount == 1 ? "1 reading" : "\(raw.hrvSampleCount) readings"
+        let readings = usedMorning ? "morning reading" : raw.hrvSampleCount == 1 ? "1 reading" : "\(raw.hrvSampleCount) readings"
         return (level, "\(readings) · \(hrvNights) nights")
+    }
+
+    /// RMSSD in ms from beat times (seconds since series start; nil marks a gap in the series).
+    /// Drops implausible intervals (outside 300–2000 ms) and jumps over 20% from the previous beat, which are usually artifacts.
+    static func rmssd(beatTimes: [Double?]) -> (rmssd: Double, beats: Int)? {
+        var intervals: [Double?] = []
+        var last: Double?
+        for t in beatTimes {
+            guard let t else { last = nil; intervals.append(nil); continue }
+            if let last {
+                let rr = (t - last) * 1000
+                intervals.append((300.0...2000.0).contains(rr) ? rr : nil)
+            }
+            last = t
+        }
+        var diffs: [Double] = []
+        var prev: Double?
+        for rr in intervals {
+            guard let rr else { prev = nil; continue }
+            if let p = prev {
+                if abs(rr - p) / p <= 0.2 { diffs.append(rr - p); prev = rr }
+            } else {
+                prev = rr
+            }
+        }
+        guard diffs.count >= 30 else { return nil }
+        let value = (diffs.map { $0 * $0 }.reduce(0, +) / Double(diffs.count)).squareRoot()
+        return (value, diffs.count + 1)
     }
 
     // MARK: Strain (0–21)
@@ -174,6 +234,11 @@ enum ScoreEngine {
         }
         out.append(points[points.count - 1])
         return out
+    }
+
+    /// Strain range for a scored day: rest when marked sick, otherwise by recovery.
+    static func strainTarget(for d: DayScores) -> ClosedRange<Double> {
+        d.status == .sick ? 0...8 : strainTarget(recovery: d.recovery)
     }
 
     /// Strain range that best matches today's recovery.

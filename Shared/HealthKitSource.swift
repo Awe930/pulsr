@@ -6,6 +6,14 @@ protocol HealthDataSource {
     /// Returns `count` days ending today, oldest first. Only the last `detailedDays` include minute heart rate.
     func loadDays(count: Int, detailedDays: Int) async throws -> [RawDay]
     func profileHints() -> (age: Int?, sex: Sex?)
+    /// RMSSD from the most recent beat-to-beat series (a Breathe session on the watch) since `since`.
+    func latestMorningRMSSD(since: Date) async throws -> (rmssd: Double, beats: Int)?
+}
+
+/// Collects beats from a heartbeat series query, which calls back once per beat.
+private final class BeatCollector {
+    var times: [Double?] = []
+    var finished = false
 }
 
 /// Reads everything your Apple Watch writes to Apple Health. Nothing is ever written back.
@@ -23,6 +31,7 @@ final class HealthKitSource: HealthDataSource {
         var set = Set<HKObjectType>(quantities.map { HKQuantityType($0) })
         set.insert(HKCategoryType(.sleepAnalysis))
         set.insert(HKObjectType.workoutType())
+        set.insert(HKSeriesType.heartbeat())   // beat-to-beat data for the morning HRV check-in
         set.insert(HKCharacteristicType(.dateOfBirth))
         set.insert(HKCharacteristicType(.biologicalSex))
         return set
@@ -30,6 +39,37 @@ final class HealthKitSource: HealthDataSource {
 
     func requestAuthorization() async throws {
         try await store.requestAuthorization(toShare: [], read: readTypes)
+    }
+
+    func latestMorningRMSSD(since: Date) async throws -> (rmssd: Double, beats: Int)? {
+        let predicate = HKQuery.predicateForSamples(withStart: since, end: .now, options: [])
+        let samples: [HKSample] = try await withCheckedThrowingContinuation { cont in
+            let query = HKSampleQuery(sampleType: HKSeriesType.heartbeat(), predicate: predicate, limit: 1,
+                                      sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)]) { _, results, error in
+                if let error { cont.resume(throwing: error) } else { cont.resume(returning: results ?? []) }
+            }
+            store.execute(query)
+        }
+        guard let series = samples.first as? HKHeartbeatSeriesSample else { return nil }
+        let collector = BeatCollector()
+        let times: [Double?] = try await withCheckedThrowingContinuation { cont in
+            let query = HKHeartbeatSeriesQuery(heartbeatSeries: series) { _, timeSinceStart, precededByGap, done, error in
+                guard !collector.finished else { return }
+                if let error {
+                    collector.finished = true
+                    cont.resume(throwing: error)
+                    return
+                }
+                if precededByGap { collector.times.append(nil) }
+                collector.times.append(timeSinceStart)
+                if done {
+                    collector.finished = true
+                    cont.resume(returning: collector.times)
+                }
+            }
+            store.execute(query)
+        }
+        return ScoreEngine.rmssd(beatTimes: times)
     }
 
     func profileHints() -> (age: Int?, sex: Sex?) {

@@ -75,6 +75,7 @@ struct RawDay: Hashable {
     var sleep: SleepSession?          // the night that ended on this day's morning
     var hrv: Double?                  // ms, median of the night's SDNN readings
     var hrvSampleCount = 0            // how many readings that median came from
+    var morningRMSSD: Double?         // ms, from the morning check-in (1-minute Breathe session on the watch)
     var restingHR: Double?            // bpm
     var respiratoryRate: Double?      // breaths / min, during sleep
     var wristTemperature: Double?     // °C, absolute sleeping wrist temperature
@@ -156,6 +157,10 @@ struct DayScores: Hashable, Identifiable {
     var tempBaseline: Baseline?
     var isCalibrating = true
     var confidence: ScoreConfidence = .low
+    var status: DayStatus = .normal          // from the check-in; sick and travel days stay out of baselines
+    var readiness: Int?                      // 1...5, how ready you felt
+    var rmssdBaseline: Baseline?             // ln(morning RMSSD), from check-ins only
+    var hrvSource: HRVMethod?                // which HRV fed today's Recovery
     var confidenceDetail = ""
     /// 7-day rolling HRV (geometric mean, ms) and where it sits against your range.
     var hrvTrend: Double?
@@ -215,6 +220,13 @@ struct UserProfile: Codable, Hashable {
     var sex: Sex = .male
     var sleepGoalHours: Double = 7.75
     var maxHeartRateOverride: Int?
+    var hrvMethodRaw: String?   // optional so older saved profiles still load
+
+    /// Morning RMSSD is the default; it falls back to overnight SDNN on days without a check-in or before 7 mornings exist.
+    var hrvMethod: HRVMethod {
+        get { hrvMethodRaw.flatMap(HRVMethod.init(rawValue:)) ?? .morningRMSSD }
+        set { hrvMethodRaw = newValue.rawValue }
+    }
 
     var maxHeartRate: Double {
         if let maxHeartRateOverride { return Double(maxHeartRateOverride) }
@@ -237,5 +249,66 @@ struct UserProfile: Codable, Hashable {
 
     func save() {
         if let data = try? JSONEncoder().encode(self) { UserDefaults.standard.set(data, forKey: Self.key) }
+    }
+}
+
+// MARK: - Check-ins (Nine30)
+
+/// Sick and travel days are skipped when Nine30 builds your normal ranges, so one rough day can't drag a baseline for a month.
+enum DayStatus: String, Codable, CaseIterable, Identifiable {
+    case normal, sick, travel
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .normal: return "Normal"
+        case .sick: return "Sick"
+        case .travel: return "Travel"
+        }
+    }
+    var excludedFromBaseline: Bool { self != .normal }
+}
+
+enum HRVMethod: String, Codable, CaseIterable, Identifiable {
+    case morningRMSSD, overnightSDNN
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .morningRMSSD: return "Morning check-in"
+        case .overnightSDNN: return "Overnight (Apple)"
+        }
+    }
+    var shortTitle: String {
+        switch self {
+        case .morningRMSSD: return "morning RMSSD"
+        case .overnightSDNN: return "overnight SDNN"
+        }
+    }
+}
+
+/// What you tell Nine30 about a day.
+struct DayLog: Codable, Hashable {
+    var readiness: Int?          // 1...5
+    var morningRMSSD: Double?    // ms
+    var morningBeats: Int?
+    var status: DayStatus?
+    var checkedInAt: Date?
+}
+
+enum DayLogStore {
+    private static let storageKey = "nine30.daylogs"
+
+    static func dayKey(_ date: Date) -> String {
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
+
+    static func load() -> [String: DayLog] {
+        guard let data = UserDefaults.standard.data(forKey: storageKey),
+              let logs = try? JSONDecoder().decode([String: DayLog].self, from: data) else { return [:] }
+        return logs
+    }
+
+    static func save(_ logs: [String: DayLog]) {
+        if let data = try? JSONEncoder().encode(logs) { UserDefaults.standard.set(data, forKey: storageKey) }
     }
 }

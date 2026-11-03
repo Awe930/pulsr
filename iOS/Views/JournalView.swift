@@ -6,6 +6,8 @@ struct Behavior: Identifiable, Hashable {
     var symbol: String
 
     static let all: [Behavior] = [
+        .init(id: "trading_day", title: "Trading day", symbol: "chart.line.uptrend.xyaxis"),
+        .init(id: "big_loss_day", title: "Big loss day", symbol: "arrow.down.right"),
         .init(id: "alcohol", title: "Alcohol", symbol: "wineglass"),
         .init(id: "caffeine_late", title: "Caffeine after 2 PM", symbol: "cup.and.saucer"),
         .init(id: "late_meal", title: "Late meal", symbol: "fork.knife"),

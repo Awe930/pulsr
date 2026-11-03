@@ -193,7 +193,7 @@ struct StrainDetailView: View {
     var body: some View {
         DetailScaffold(title: store.isToday ? "Today" : store.selected?.date.dayLabel ?? "", accent: Theme.strain[1]) {
             if let d = store.selected {
-                let target = ScoreEngine.strainTarget(recovery: d.recovery)
+                let target = ScoreEngine.strainTarget(for: d)
                 HeroRing(progress: d.strain / 21, colors: Theme.strain, value: d.strain.oneDecimal, unit: nil, caption: "Day Strain",
                          marker: target.lowerBound / 21, orb: .strain, speed: 1.3)
                 Text("Target \(Int(target.lowerBound))–\(Int(target.upperBound)) based on your recovery")

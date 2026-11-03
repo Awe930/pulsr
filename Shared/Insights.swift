@@ -10,6 +10,9 @@ enum Insights {
     }
 
     static func headline(_ d: DayScores) -> (title: String, body: String) {
+        if d.status == .sick {
+            return ("Rest day", "You marked today as sick. Keep Strain under 8, drink water and get to bed early. Today stays out of your normal ranges.")
+        }
         guard let recovery = d.recovery else {
             return ("Waiting for tonight", "Wear your Apple Watch to sleep. Recovery appears once there is overnight heart rate variability.")
         }
@@ -23,7 +26,8 @@ enum Insights {
             let pct = Int(abs(change * 100).rounded())
             hrvText = change >= 0 ? "Your HRV is \(pct)% above your baseline. " : "Your HRV is \(pct)% below your baseline. "
         }
-        let calibrating = d.isCalibrating ? " Nine30 is still learning your baseline, so expect scores to settle over the first week." : ""
+        var calibrating = d.isCalibrating ? " Nine30 is still learning your baseline, so expect scores to settle over the first week." : ""
+        if d.status == .travel { calibrating += " Travel day: left out of your normal ranges." }
         switch RecoveryZone(recovery) {
         case .green:
             return ("Primed to perform", hrvText + "Your body can take on significant exertion — aim for a Strain of \(targetText)." + calibrating)
