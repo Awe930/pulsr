@@ -144,3 +144,28 @@ Sick days set the strain target to 0–8. Readiness (1–5) is stored for fittin
 
 Each vital is compared with your ±2 SD normal range. Two or more out of range at once shows the Body check alert
 (the Apple Vitals rule: one odd reading is noise).
+
+## Focus windows (Nine30)
+
+A RISE-style heuristic anchored on when you woke (or your 7-night typical wake time), not a measurement:
+
+```
+groggy until   wake + 1 h 15  (+15 min per hour of sleep debt, at most +1 h)
+peak focus     wake + 2.5 h … + 5 h
+afternoon dip  wake + 7 h … + 8.5 h
+second wind    wake + 10.5 h … + 12.5 h
+bedtime        typical wake tomorrow − tonight's need / 0.92;  wind down 1 h before
+```
+
+The market session is 9:30–4:00 New York time on weekdays (holidays are not handled). Check-in readiness ratings
+are the test of whether these windows fit you.
+
+## Energy (Nine30)
+
+Body Battery style, from heart-rate stress: starts at `30 + 0.65 × Recovery` at wake; every 15 minutes drains
+`0.2 + 0.55 × stress` (stress 0–3), recharges 0.3 when stress < 0.4, drains 1.8 during workouts; clamped 3–100.
+
+## Strength load (Nine30)
+
+Strength workouts add `0.6 TRIMP per minute` on days with heart-rate data, because lifting keeps heart rate low
+while still loading the body. A judgment call to revisit.

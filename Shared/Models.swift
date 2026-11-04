@@ -183,6 +183,7 @@ struct DayScores: Hashable, Identifiable {
 
     // Strain
     var strain: Double = 0
+    var trimp: Double = 0          // raw daily load behind Strain, for training balance
     var zoneMinutes: [Double] = Array(repeating: 0, count: 6)   // index 0 = below zone 1
     var strengthMinutes: Double = 0
     var workoutStrain: [UUID: Double] = [:]

@@ -44,6 +44,7 @@ enum ScoreEngine {
 
             let strainResult = strain(heartRate: raw.heartRate, restingHR: raw.restingHR ?? s.rhrBaseline?.mean ?? 60, profile: profile, workouts: raw.workouts)
             s.strain = strainResult.strain
+            s.trimp = strainResult.trimp
             s.zoneMinutes = strainResult.zoneMinutes
             s.workoutStrain = strainResult.perWorkout
             s.strengthMinutes = raw.workouts.filter(\.isStrength).map(\.duration).reduce(0, +) / 60
@@ -177,6 +178,7 @@ enum ScoreEngine {
 
     struct StrainResult {
         var strain: Double
+        var trimp: Double = 0
         var zoneMinutes: [Double]
         var perWorkout: [UUID: Double]
     }
@@ -201,10 +203,22 @@ enum ScoreEngine {
                 perWorkoutTrimp[w.id, default: 0] += load
             }
         }
-        return StrainResult(strain: strainScale(trimp), zoneMinutes: zones, perWorkout: perWorkoutTrimp.mapValues(strainScale))
+        // Lifting keeps heart rate low but still loads the body. Heuristic: each strength minute adds a fixed TRIMP,
+        // only on days with heart-rate data so older days stay comparable.
+        if !heartRate.isEmpty {
+            for w in workouts where w.isStrength {
+                let bonus = w.duration / 60 * strengthTrimpPerMinute
+                trimp += bonus
+                perWorkoutTrimp[w.id, default: 0] += bonus
+            }
+        }
+        return StrainResult(strain: strainScale(trimp), trimp: trimp, zoneMinutes: zones, perWorkout: perWorkoutTrimp.mapValues(strainScale))
     }
 
     static func strainScale(_ trimp: Double) -> Double { 21 * (1 - exp(-trimp / 125)) }
+
+    /// TRIMP per minute of strength training (about a steady moderate effort). A judgment call, documented in ALGORITHMS.md.
+    static let strengthTrimpPerMinute = 0.6
 
     /// 0 = below zone 1, 1…5 = zones by % of max heart rate (50/60/70/80/90).
     static func zoneIndex(bpm: Double, maxHR: Double) -> Int {

@@ -16,7 +16,9 @@ struct TodayView: View {
                     bodyCheckAlert(day)
                     insight(day)
                     if store.isToday { checkInCard(day) }
+                    focusCard(day)
                     monitors(day)
+                    marketCard(day)
                     SectionTitle(title: "My Day")
                     activities(day)
                     if store.isToday { tonight(day) }
@@ -200,6 +202,62 @@ struct TodayView: View {
                 Button(entry.checkedInAt == nil ? "Start" : "Redo") { showCheckIn = true }
                     .buttonStyle(.glass)
             }
+        }
+    }
+
+    /// Peak and dip on a 6 AM–10 PM strip, with the trading session outlined.
+    @ViewBuilder private func focusCard(_ d: DayScores) -> some View {
+        if let s = Focus.schedule(for: d, history: store.window(7), profile: store.profile) {
+            let session = Focus.marketSession(on: d.date)
+            let energyNow = store.isToday ? Focus.energy(d, schedule: s, until: .now).last?.level : nil
+            NavigationLink(value: Route.focus) {
+                GlassCard(padding: 16) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Focus windows").font(.headline)
+                            Spacer()
+                            if let energyNow {
+                                Text("Energy \(Int(energyNow.rounded()))").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                            }
+                            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                        }
+                        DayStrip(day: d.date, schedule: s, session: session, showNow: store.isToday)
+                            .frame(height: 26)
+                        HStack {
+                            Text("Peak \(s.peak.start.shortTime)–\(s.peak.end.shortTime)")
+                            Spacer()
+                            Text("Dip \(s.dip.start.shortTime)–\(s.dip.end.shortTime)").foregroundStyle(Theme.hurts)
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder private func marketCard(_ d: DayScores) -> some View {
+        if let m = Focus.marketStress(d, session: Focus.marketSession(on: d.date)) {
+            NavigationLink(value: Route.focus) {
+                GlassCard(padding: 16) {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Market hours").font(.headline)
+                            Text("Stress \(m.average.oneDecimal) avg · peak \(m.peak.level.oneDecimal) at \(m.peak.date.shortTime)")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if let outside = m.outsideAverage {
+                            let diff = m.average - outside
+                            Text(diff >= 0 ? "+\(diff.oneDecimal) vs rest of day" : "\(diff.oneDecimal) vs rest of day")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(diff > 0.3 ? Theme.hurts : .secondary)
+                        }
+                    }
+                }
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -645,5 +703,48 @@ struct CheckInView: View {
             entry.morningBeats = b
             entry.checkedInAt = .now
         }
+    }
+}
+
+/// 6 AM to 10 PM: market session outlined, groggy start, peak, dip, and a marker for now.
+struct DayStrip: View {
+    var day: Date
+    var schedule: EnergySchedule
+    var session: DateInterval?
+    var showNow: Bool
+
+    var body: some View {
+        GeometryReader { geo in
+            let start = Calendar.current.startOfDay(for: day).addingTimeInterval(6 * 3600)
+            let total = 16.0 * 3600
+            let w = geo.size.width
+            let h = geo.size.height
+            let x: (Date) -> CGFloat = { t in CGFloat((t.timeIntervalSince(start) / total).clamped(0, 1)) * w }
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(0.06))
+                if let session {
+                    RoundedRectangle(cornerRadius: 7)
+                        .strokeBorder(Color.primary.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                        .frame(width: max(x(session.end) - x(session.start), 1), height: h)
+                        .offset(x: x(session.start))
+                }
+                RoundedRectangle(cornerRadius: 4).fill(Color.primary.opacity(0.15))
+                    .frame(width: max(x(schedule.grogginessEnds) - x(schedule.wake), 1), height: h * 0.4)
+                    .offset(x: x(schedule.wake), y: h * 0.3)
+                RoundedRectangle(cornerRadius: 5).fill(Color.primary)
+                    .frame(width: max(x(schedule.peak.end) - x(schedule.peak.start), 1), height: h * 0.55)
+                    .offset(x: x(schedule.peak.start), y: h * 0.225)
+                RoundedRectangle(cornerRadius: 4).fill(Theme.hurts)
+                    .frame(width: max(x(schedule.dip.end) - x(schedule.dip.start), 1), height: h * 0.4)
+                    .offset(x: x(schedule.dip.start), y: h * 0.3)
+                if showNow {
+                    Capsule().fill(Theme.yellow)
+                        .frame(width: 2, height: h + 8)
+                        .offset(x: x(.now) - 1, y: -4)
+                }
+            }
+        }
+        .accessibilityElement()
+        .accessibilityLabel("Peak \(schedule.peak.start.shortTime) to \(schedule.peak.end.shortTime), dip \(schedule.dip.start.shortTime) to \(schedule.dip.end.shortTime)")
     }
 }

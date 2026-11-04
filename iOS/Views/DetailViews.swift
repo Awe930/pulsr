@@ -364,3 +364,107 @@ struct StrainRecoveryChart: View {
         }
     }
 }
+
+// MARK: - Focus and energy (Nine30)
+
+struct FocusView: View {
+    @Environment(MetricsStore.self) private var store
+
+    var body: some View {
+        DetailScaffold(title: "Focus and energy", accent: Theme.yellow) {
+            if let d = store.selected, let s = Focus.schedule(for: d, history: store.window(7), profile: store.profile) {
+                let session = Focus.marketSession(on: d.date)
+                GlassCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Eyebrow(text: "Predicted alertness · from your wake time")
+                        Chart {
+                            if let session {
+                                RectangleMark(xStart: .value("Open", session.start), xEnd: .value("Close", session.end),
+                                              yStart: .value("Low", 0.0), yEnd: .value("High", 1.0))
+                                    .foregroundStyle(Color.primary.opacity(0.06))
+                            }
+                            RectangleMark(xStart: .value("Peak start", s.peak.start), xEnd: .value("Peak end", s.peak.end),
+                                          yStart: .value("Low", 0.0), yEnd: .value("High", 1.0))
+                                .foregroundStyle(Theme.green.opacity(0.14))
+                            RectangleMark(xStart: .value("Dip start", s.dip.start), xEnd: .value("Dip end", s.dip.end),
+                                          yStart: .value("Low", 0.0), yEnd: .value("High", 1.0))
+                                .foregroundStyle(Theme.hurts.opacity(0.16))
+                            ForEach(s.curve()) { p in
+                                LineMark(x: .value("Time", p.date), y: .value("Alertness", p.level))
+                                    .interpolationMethod(.catmullRom)
+                                    .foregroundStyle(Color.primary)
+                            }
+                            if store.isToday {
+                                RuleMark(x: .value("Now", Date.now)).foregroundStyle(Theme.yellow)
+                            }
+                        }
+                        .chartYScale(domain: 0...1)
+                        .chartYAxis(.hidden)
+                        .frame(height: 190)
+                        Text(Focus.sessionNote(s, session: session)).font(.callout).foregroundStyle(.secondary)
+                    }
+                }
+
+                GlassCard {
+                    VStack(spacing: 0) {
+                        scheduleRow("Groggy until", s.grogginessEnds.shortTime, Color.primary.opacity(0.4))
+                        Divider().opacity(0.4)
+                        scheduleRow("Peak focus", "\(s.peak.start.shortTime)–\(s.peak.end.shortTime)", Color.primary)
+                        Divider().opacity(0.4)
+                        scheduleRow("Afternoon dip", "\(s.dip.start.shortTime)–\(s.dip.end.shortTime)", Theme.hurts)
+                        Divider().opacity(0.4)
+                        scheduleRow("Second wind", "\(s.secondWind.start.shortTime)–\(s.secondWind.end.shortTime)", Color.primary.opacity(0.7))
+                        Divider().opacity(0.4)
+                        scheduleRow("Wind down", s.windDown.shortTime, Theme.sleep[0])
+                        Divider().opacity(0.4)
+                        scheduleRow("Bedtime", s.bedtime.shortTime, Theme.sleep[0])
+                    }
+                }
+
+                let end = store.isToday ? Date.now : min(s.bedtime, Calendar.current.startOfDay(for: d.date).addingTimeInterval(24 * 3600))
+                let energy = Focus.energy(d, schedule: s, until: end)
+                if energy.count > 1 {
+                    GlassCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Eyebrow(text: "Energy through the day")
+                                Spacer()
+                                Text("\(Int((energy.last?.level ?? 0).rounded())) now").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                            }
+                            Chart(energy) { p in
+                                AreaMark(x: .value("Time", p.date), y: .value("Energy", p.level))
+                                    .interpolationMethod(.catmullRom)
+                                    .foregroundStyle(LinearGradient(colors: [Theme.yellow.opacity(0.35), Theme.yellow.opacity(0.02)], startPoint: .top, endPoint: .bottom))
+                                LineMark(x: .value("Time", p.date), y: .value("Energy", p.level))
+                                    .interpolationMethod(.catmullRom)
+                                    .foregroundStyle(Theme.yellow)
+                            }
+                            .chartYScale(domain: 0...100)
+                            .frame(height: 150)
+                            Text("Starts from your Recovery when you wake, drains with stress and exercise, and recharges a little when you're calm.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                if let m = Focus.marketStress(d, session: session) {
+                    InsightCallout(text: "Market hours: stress averaged \(m.average.oneDecimal) of 3, peaking at \(m.peak.level.oneDecimal) around \(m.peak.date.shortTime)." + (m.outsideAverage.map { " The rest of your waking day averaged \($0.oneDecimal)." } ?? ""))
+                }
+
+                InsightCallout(text: "Focus windows are a prediction from your wake time and sleep debt, not a measurement. Your morning check-in ratings will show whether they fit you.")
+            } else {
+                InsightCallout(text: "Focus windows appear once Nine30 has a few nights of sleep to learn your wake time.")
+            }
+        }
+    }
+
+    private func scheduleRow(_ title: String, _ value: String, _ tint: Color) -> some View {
+        HStack(spacing: 12) {
+            Circle().fill(tint).frame(width: 8, height: 8)
+            Text(title)
+            Spacer()
+            Text(value).monospacedDigit().fontWeight(.medium)
+        }
+        .padding(.vertical, 11)
+    }
+}

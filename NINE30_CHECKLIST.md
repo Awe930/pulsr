@@ -22,11 +22,11 @@ Running list for PAK's personal build of Pulsr. Updated with every push.
 - [x] Status switch in the check-in: Normal / Sick / Travel (left out of baselines; sick = strain 0–8)
 - [x] HRV method setting: Morning check-in (RMSSD, default) / Overnight (Apple SDNN)
 
-## Stage 3 · Deeper views
-- [ ] Focus windows vs market hours (energy schedule from sleep timing)
+## Stage 3 · Deeper views (3a pushed Nov 3)
+- [x] Focus windows vs market hours (Today strip + Focus and energy screen)
 - [ ] Training balance: fitness, fatigue, form, acute:chronic
-- [ ] Energy through the day
-- [ ] Market-hours stress lens + trading tags
+- [x] Energy through the day
+- [x] Market-hours stress card (tags done in stage 2)
 - [ ] Habit impact with ranges, 10+ days each side, adjusted for prior strain
 - [ ] Siri and Shortcuts (App Intents)
 
@@ -52,3 +52,4 @@ Running list for PAK's personal build of Pulsr. Updated with every push.
 - [x] Journal: Trading day and Big loss day tags
 - [x] Sleep card shows last night next to the 14-night balance ("Surplus · last +0:41")
 - [x] Surplus nights count at half weight (debt full); revisit with readiness data
+- [x] Strength load: 0.6 TRIMP per strength minute

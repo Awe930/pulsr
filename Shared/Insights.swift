@@ -93,3 +93,154 @@ enum Insights {
         return lines.joined(separator: " ")
     }
 }
+
+// MARK: - Focus windows and energy (Nine30)
+
+struct LevelPoint: Identifiable, Hashable {
+    var id: Date { date }
+    var date: Date
+    var level: Double   // 0...1 for alertness, 0...100 for energy
+}
+
+/// Predicted energy schedule for a day, anchored on when you woke up (a RISE-style heuristic, not a measurement).
+struct EnergySchedule {
+    var wake: Date
+    var grogginessEnds: Date
+    var peak: DateInterval
+    var dip: DateInterval
+    var secondWind: DateInterval
+    var windDown: Date
+    var bedtime: Date
+
+    /// Predicted alertness, 0...1: sleep inertia after waking, a late-morning peak, an early-afternoon dip, an evening second wind.
+    func alertness(at t: Date) -> Double {
+        let h = t.timeIntervalSince(wake) / 3600
+        guard h >= 0 else { return 0.1 }
+        func g(_ m: Double, _ s: Double) -> Double { exp(-pow(h - m, 2) / (2 * s * s)) }
+        let peakMid = peak.start.addingTimeInterval(peak.duration / 2).timeIntervalSince(wake) / 3600
+        let dipMid = dip.start.addingTimeInterval(dip.duration / 2).timeIntervalSince(wake) / 3600
+        let windMid = secondWind.start.addingTimeInterval(secondWind.duration / 2).timeIntervalSince(wake) / 3600
+        let inertia = grogginessEnds.timeIntervalSince(wake) / 3600
+        var v = 0.38 + 0.5 * g(peakMid, 1.4) + 0.28 * g(windMid, 1.3) - 0.2 * g(dipMid, 0.8)
+        v -= 0.4 * exp(-h / max(inertia / 2.2, 0.3))
+        v -= 0.05 * max(0, h - 13)
+        return v.clamped(0.02, 1)
+    }
+
+    func curve(stepMinutes: Double = 15) -> [LevelPoint] {
+        var out: [LevelPoint] = []
+        var t = wake
+        while t <= bedtime {
+            out.append(LevelPoint(date: t, level: alertness(at: t)))
+            t = t.addingTimeInterval(stepMinutes * 60)
+        }
+        return out
+    }
+}
+
+enum Focus {
+    /// The regular NYSE/CME cash session, 9:30–4:00 New York time, on weekdays (holidays not handled).
+    static func marketSession(on day: Date) -> DateInterval? {
+        var ny = Calendar(identifier: .gregorian)
+        guard let zone = TimeZone(identifier: "America/New_York") else { return nil }
+        ny.timeZone = zone
+        let local = Calendar.current.dateComponents([.year, .month, .day], from: day)
+        var open = DateComponents()
+        open.year = local.year; open.month = local.month; open.day = local.day
+        open.hour = 9; open.minute = 30
+        var close = open
+        close.hour = 16; close.minute = 0
+        guard let o = ny.date(from: open), let c = ny.date(from: close) else { return nil }
+        let weekday = ny.component(.weekday, from: o)
+        guard weekday != 1, weekday != 7 else { return nil }
+        return DateInterval(start: o, end: c)
+    }
+
+    /// Typical wake time (minutes after midnight) over the last 7 nights.
+    static func typicalWakeMinutes(_ days: [DayScores]) -> Double? {
+        let cal = Calendar.current
+        let wakes = days.suffix(7).compactMap { $0.raw.sleep?.end }
+        guard !wakes.isEmpty else { return nil }
+        return wakes.map { Double(cal.component(.hour, from: $0) * 60 + cal.component(.minute, from: $0)) }.reduce(0, +) / Double(wakes.count)
+    }
+
+    /// Windows are offsets from wake: groggy ~75 min (longer with sleep debt), peak +2.5–5 h, dip +7–8.5 h, second wind +10.5–12.5 h.
+    static func schedule(for day: DayScores, history: [DayScores], profile: UserProfile) -> EnergySchedule? {
+        let cal = Calendar.current
+        let dayStart = cal.startOfDay(for: day.date)
+        guard let typical = typicalWakeMinutes(history) else { return nil }
+        let wake = day.raw.sleep?.end ?? dayStart.addingTimeInterval(typical * 60)
+        func at(_ hours: Double) -> Date { wake.addingTimeInterval(hours * 3600) }
+        let inertia = 1.25 + min(day.sleepDebt / 3600 * 0.25, 1.0)
+        let need = ScoreEngine.sleepNeed(profile: profile, previousStrain: day.strain, debt: day.sleepDebt)
+        let nextWake = cal.date(byAdding: .day, value: 1, to: dayStart)!.addingTimeInterval(typical * 60)
+        let bedtime = nextWake.addingTimeInterval(-need / 0.92)
+        return EnergySchedule(
+            wake: wake,
+            grogginessEnds: at(inertia),
+            peak: DateInterval(start: at(2.5), end: at(5.0)),
+            dip: DateInterval(start: at(7.0), end: at(8.5)),
+            secondWind: DateInterval(start: at(10.5), end: at(12.5)),
+            windDown: bedtime.addingTimeInterval(-3600),
+            bedtime: bedtime)
+    }
+
+    /// One plain sentence on how the schedule meets the trading session.
+    static func sessionNote(_ s: EnergySchedule, session: DateInterval?) -> String {
+        guard let session else { return "No market session today. Use the peak for your hardest thinking." }
+        var parts: [String] = []
+        if let overlap = s.peak.intersection(with: session), overlap.duration >= 3600 {
+            parts.append(overlap.start <= session.start.addingTimeInterval(1800) ? "Your peak lines up with the open." : "Your peak overlaps the morning session.")
+        } else if s.peak.end <= session.start {
+            parts.append("Your peak ends before the open, so the first hour may feel flatter.")
+        } else {
+            parts.append("Your peak falls later than the open.")
+        }
+        if let dipOverlap = s.dip.intersection(with: session), dipOverlap.duration >= 1800 {
+            parts.append("The dip (\(s.dip.start.shortTime)–\(s.dip.end.shortTime)) lands inside the session: size down or step away then.")
+        }
+        return parts.joined(separator: " ")
+    }
+
+    struct MarketStress {
+        var average: Double
+        var peak: StressPoint
+        var outsideAverage: Double?
+    }
+
+    /// Stress (0–3) during the session vs. the rest of the waking day.
+    static func marketStress(_ d: DayScores, session: DateInterval?) -> MarketStress? {
+        guard let session else { return nil }
+        let awake = d.stress.filter { p in !(d.raw.sleep.map { $0.start <= p.date && p.date <= $0.end } ?? false) }
+        let inside = awake.filter { session.contains($0.date) }
+        guard let peak = inside.max(by: { $0.level < $1.level }) else { return nil }
+        let outside = awake.filter { !session.contains($0.date) }
+        let avg = inside.map(\.level).reduce(0, +) / Double(inside.count)
+        let out = outside.isEmpty ? nil : outside.map(\.level).reduce(0, +) / Double(outside.count)
+        return MarketStress(average: avg, peak: peak, outsideAverage: out)
+    }
+
+    /// Energy 0–100 through the day, Body Battery style: starts from Recovery at wake, drains with stress and exercise,
+    /// recharges a little while you're calm. A heuristic built from your heart rate.
+    static func energy(_ d: DayScores, schedule: EnergySchedule, until end: Date) -> [LevelPoint] {
+        var level = 30 + 0.65 * (d.recovery ?? 55)
+        var out: [LevelPoint] = [LevelPoint(date: schedule.wake, level: level)]
+        let buckets = Dictionary(d.stress.map { ($0.date, $0.level) }, uniquingKeysWith: { a, _ in a })
+        var t = schedule.wake
+        let step = 15.0 * 60
+        while t < end {
+            let bucket = Date(timeIntervalSinceReferenceDate: floor(t.timeIntervalSinceReferenceDate / 900) * 900)
+            if d.raw.workouts.contains(where: { $0.start <= t && t <= $0.end }) {
+                level -= 1.8
+            } else if let s = buckets[bucket] {
+                level -= s < 0.4 ? -0.3 : 0.2 + 0.55 * s
+            } else {
+                level -= 0.45   // no reading: assume ordinary waking drain
+            }
+            level = level.clamped(3, 100)
+            t = t.addingTimeInterval(step)
+            out.append(LevelPoint(date: t, level: level))
+        }
+        return out
+    }
+}
