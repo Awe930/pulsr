@@ -361,6 +361,8 @@ struct MetricCapsule: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(value).font(.system(size: 19, weight: .medium)).monospacedDigit()
                 Eyebrow(text: title)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)   // keep both capsules one line tall
             }
             Spacer(minLength: 0)
         }
