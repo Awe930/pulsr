@@ -262,6 +262,9 @@ enum ScoreEngine {
     }
 
     static let maxSleepSurplus: TimeInterval = 3 * 3600
+    /// Extra sleep past your goal helps less than missing sleep hurts, so surplus nights count at half weight.
+    /// A judgment call, to be checked against readiness ratings after 4–6 weeks.
+    static let surplusWeight = 0.5
 
     /// Sleep balance over the last 14 nights (oldest first, last night last), measured against your goal so it cannot compound.
     /// Recent nights weigh more: last night counts fully, two weeks ago about 1/14.
@@ -273,7 +276,8 @@ enum ScoreEngine {
         for (i, night) in nights.enumerated() {
             guard let slept = night?.asleep else { continue }   // a night without data neither adds nor repays
             let weight = Double(14 - (n - 1 - i)) / 14
-            balance += weight * (slept - goalHours * 3600)
+            let delta = slept - goalHours * 3600
+            balance += weight * (delta > 0 ? delta * surplusWeight : delta)
         }
         return min(balance, maxSleepSurplus)
     }
