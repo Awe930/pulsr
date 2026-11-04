@@ -23,6 +23,10 @@ struct TrendsView: View {
 
                 averages(days)
 
+                if let balance = ScoreEngine.trainingBalance(store.days) {
+                    TrainingBalanceCard(balance: balance)
+                }
+
                 GlassCard {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
@@ -118,5 +122,54 @@ struct TrendsView: View {
 struct DotLabelStyle: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
         HStack(spacing: 4) { configuration.icon.font(.system(size: 6)); configuration.title.foregroundStyle(.secondary) }
+    }
+}
+
+/// Fitness (42-day load), fatigue (7-day load), form, and the acute:chronic ratio.
+struct TrainingBalanceCard: View {
+    var balance: ScoreEngine.TrainingBalance
+
+    var body: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Eyebrow(text: "Training balance")
+                HStack(spacing: 10) {
+                    tile("Fitness", balance.fitness, "42-day load")
+                    tile("Fatigue", balance.fatigue, "7-day load")
+                    tile("Form", balance.form, balance.formLabel)
+                }
+                Chart(balance.series) { p in
+                    LineMark(x: .value("Day", p.date), y: .value("Load", p.fitness), series: .value("Kind", "Fitness"))
+                        .foregroundStyle(Color.primary)
+                    LineMark(x: .value("Day", p.date), y: .value("Load", p.fatigue), series: .value("Kind", "Fatigue"))
+                        .foregroundStyle(Theme.hurts)
+                        .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 4]))
+                }
+                .chartLegend(.hidden)
+                .frame(height: 140)
+                HStack(spacing: 14) {
+                    Label("Fitness", systemImage: "line.diagonal").foregroundStyle(Color.primary)
+                    Label("Fatigue", systemImage: "line.diagonal").foregroundStyle(Theme.hurts)
+                }
+                .font(.caption2)
+                if let acwr = balance.acwr, let label = balance.acwrLabel {
+                    HStack {
+                        Text("Acute : chronic")
+                        Spacer()
+                        Text("\(String(format: "%.2f", acwr)) · \(label)").fontWeight(.semibold)
+                    }
+                    .font(.caption)
+                }
+            }
+        }
+    }
+
+    private func tile(_ title: String, _ value: Double, _ sub: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            Text("\(Int(value.rounded()))").font(.title3.weight(.semibold)).monospacedDigit()
+            Text(sub).font(.caption2).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

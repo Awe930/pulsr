@@ -57,28 +57,55 @@ final class JournalStore {
     struct Impact: Identifiable {
         var id: String { behavior.id }
         var behavior: Behavior
-        var percent: Double   // change in next-day recovery when "yes"
-        var samples: Int
+        var points: Double     // change in next-day Recovery, in points, after adjusting for that day's strain
+        var low: Double        // about a 95% range for the true effect
+        var high: Double
+        var yes: Int
+        var no: Int
+        var isClear: Bool { low > 0 || high < 0 }
     }
 
-    /// Compares next-day recovery after "yes" vs "no" days. Needs at least 3 of each.
+    static let minimumDays = 10
+
+    /// Next-day Recovery after "yes" vs "no" days. The day's strain is regressed out first, so a habit that tends to land
+    /// on hard training days isn't blamed for the training. Needs 10+ days on each side. Correlation, not cause.
     func impacts(days: [DayScores], demo: Bool) -> [Impact] {
         let source = demo ? Self.demoEntries(days: days) : entries
-        let recoveryByKey = Dictionary(days.compactMap { d in d.recovery.map { (Self.key(d.date), $0) } }, uniquingKeysWith: { a, _ in a })
         let cal = Calendar.current
-        return Behavior.all.compactMap { b in
-            var yes: [Double] = [], no: [Double] = []
-            for d in days {
-                guard let answer = source[Self.key(d.date)]?[b.id],
-                      let next = cal.date(byAdding: .day, value: 1, to: d.date),
-                      let recovery = recoveryByKey[Self.key(next)] else { continue }
-                if answer { yes.append(recovery) } else { no.append(recovery) }
-            }
-            guard yes.count >= 3, no.count >= 3 else { return nil }
-            let my = yes.reduce(0, +) / Double(yes.count), mn = no.reduce(0, +) / Double(no.count)
-            return Impact(behavior: b, percent: (my - mn) / max(mn, 1) * 100, samples: yes.count + no.count)
+        let recoveryByKey = Dictionary(days.compactMap { d in d.recovery.map { (Self.key(d.date), $0) } }, uniquingKeysWith: { a, _ in a })
+        var keys: [String] = [], strains: [Double] = [], nexts: [Double] = []
+        for d in days {
+            guard let next = cal.date(byAdding: .day, value: 1, to: d.date), let r = recoveryByKey[Self.key(next)] else { continue }
+            keys.append(Self.key(d.date)); strains.append(d.strain); nexts.append(r)
         }
-        .sorted { $0.percent > $1.percent }
+        guard keys.count >= 2 * Self.minimumDays else { return [] }
+        let n = Double(keys.count)
+        let mx = strains.reduce(0, +) / n, my = nexts.reduce(0, +) / n
+        var sxx = 0.0, sxy = 0.0
+        for i in keys.indices {
+            sxx += (strains[i] - mx) * (strains[i] - mx)
+            sxy += (strains[i] - mx) * (nexts[i] - my)
+        }
+        let slope = sxx > 0 ? sxy / sxx : 0
+        var residual: [String: Double] = [:]
+        for i in keys.indices { residual[keys[i]] = nexts[i] - (my + slope * (strains[i] - mx)) }
+
+        return Behavior.all.compactMap { behavior -> Impact? in
+            var yes: [Double] = [], no: [Double] = []
+            for (key, r) in residual {
+                guard let answer = source[key]?[behavior.id] else { continue }
+                if answer { yes.append(r) } else { no.append(r) }
+            }
+            guard yes.count >= Self.minimumDays, no.count >= Self.minimumDays else { return nil }
+            let meanYes = yes.reduce(0, +) / Double(yes.count), meanNo = no.reduce(0, +) / Double(no.count)
+            let varYes = yes.map { ($0 - meanYes) * ($0 - meanYes) }.reduce(0, +) / Double(yes.count - 1)
+            let varNo = no.map { ($0 - meanNo) * ($0 - meanNo) }.reduce(0, +) / Double(no.count - 1)
+            let diff = meanYes - meanNo
+            let se = (varYes / Double(yes.count) + varNo / Double(no.count)).squareRoot()
+            let t = 2.0   // about 95% with 10–30 days a side; a touch conservative beyond that
+            return Impact(behavior: behavior, points: diff, low: diff - t * se, high: diff + t * se, yes: yes.count, no: no.count)
+        }
+        .sorted { $0.points > $1.points }
     }
 
     /// Plausible answers for demo mode, correlated with the following day's recovery.
@@ -194,7 +221,7 @@ struct JournalInsightsView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Eyebrow(text: "Refreshed daily")
                 Text("Recovery Impact Analysis").font(.title2.weight(.semibold))
-                Text("How each behavior changed your next-day Recovery over the past 90 days.")
+                Text("Next-day Recovery after each tag, in points, with the range the true effect likely falls in. Adjusted for that day's strain.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -211,12 +238,15 @@ struct JournalInsightsView: View {
 
             if impacts.isEmpty {
                 GlassCard {
-                    Text("Answer the journal for a few weeks — each behavior needs at least 3 “yes” and 3 “no” days to show its impact.")
+                    Text("Answer the journal for a few weeks. Each tag needs at least 10 “yes” and 10 “no” days before it shows a number.")
                         .foregroundStyle(.secondary)
                 }
             }
             ForEach(impacts) { impact in
                 ImpactRow(impact: impact)
+            }
+            if !impacts.isEmpty {
+                InsightCallout(text: "Gray rows are not clear yet: their range still crosses zero. Correlation, not cause: a big loss day may also be a short-sleep day.")
             }
         }
     }
@@ -226,29 +256,48 @@ struct ImpactRow: View {
     var impact: JournalStore.Impact
 
     var body: some View {
-        let color = impact.percent >= 0 ? Theme.helps : Theme.hurts
+        let color: Color = !impact.isClear ? .secondary : impact.points >= 0 ? Theme.helps : Theme.hurts
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(impact.behavior.title).font(.footnote.weight(.semibold))
-                Spacer()
-                Text(String(format: "%+.0f%%", impact.percent))
-                    .font(.system(.callout, design: .rounded).weight(.bold))
-                    .foregroundStyle(abs(impact.percent) < 2 ? Color.secondary : color)
-            }
-            GeometryReader { geo in
-                let half = geo.size.width / 2
-                let w = min(half, half * abs(impact.percent) / 25)
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.primary.opacity(0.06))
-                    Capsule().fill(abs(impact.percent) < 2 ? .gray : color)
-                        .frame(width: max(w, 4))
-                        .offset(x: impact.percent >= 0 ? half : half - w)
-                    Circle().fill(Color.primary).frame(width: 6, height: 6).offset(x: half - 3)
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(impact.behavior.title).font(.footnote.weight(.semibold))
+                    Text("\(impact.yes) yes · \(impact.no) no" + (impact.isClear ? "" : " · not clear yet"))
+                        .font(.caption2).foregroundStyle(.secondary)
                 }
+                Spacer()
+                Text(String(format: "%+.0f pts", impact.points))
+                    .font(.system(.callout, design: .rounded).weight(.bold))
+                    .foregroundStyle(color)
             }
-            .frame(height: 8)
+            ImpactRangeBar(points: impact.points, low: impact.low, high: impact.high, color: color)
+                .frame(height: 14)
         }
         .padding(16)
         .glassEffect(.regular, in: .rect(cornerRadius: 20))
+    }
+}
+
+/// Effect in points on a −25…+25 axis: the dot is the estimate, the bar the likely range, the tick is zero.
+struct ImpactRangeBar: View {
+    var points: Double
+    var low: Double
+    var high: Double
+    var color: Color
+
+    var body: some View {
+        GeometryReader { geo in
+            let limit = 25.0
+            let w = geo.size.width
+            let x: (Double) -> CGFloat = { v in CGFloat(((v + limit) / (2 * limit)).clamped(0, 1)) * w }
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.primary.opacity(0.06)).frame(height: 6).offset(y: 4)
+                Rectangle().fill(Color.primary.opacity(0.35)).frame(width: 1, height: 14).offset(x: x(0))
+                Capsule().fill(color.opacity(0.45))
+                    .frame(width: max(x(high) - x(low), 4), height: 6)
+                    .offset(x: x(low), y: 4)
+                Circle().fill(color).frame(width: 12, height: 12).offset(x: x(points) - 6, y: 1)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }

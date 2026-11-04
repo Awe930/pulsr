@@ -33,7 +33,7 @@ final class MetricsStore {
     private let historyDays: Int
     private let detailedDays: Int
 
-    init(historyDays: Int = 60, detailedDays: Int = 35) {
+    init(historyDays: Int = 60, detailedDays: Int = 60) {
         self.historyDays = historyDays
         self.detailedDays = detailedDays
         profile = UserProfile.load()
@@ -88,7 +88,22 @@ final class MetricsStore {
         guard !rawDays.isEmpty else { return }
         days = ScoreEngine.score(rawDays, profile: profile, logs: logs)
         bodyAge = ScoreEngine.bodyAge(days: days, profile: profile)
+        cacheTodaySummary()
         selectedIndex = min(selectedIndex, max(days.count - 1, 0))
+    }
+
+    private func cacheTodaySummary() {
+        guard let t = days.last else { return }
+        let head = Insights.headline(t)
+        let target = ScoreEngine.strainTarget(for: t)
+        let recovery = t.recovery.map {
+            "Recovery is \(Int($0.rounded())) percent, \(head.title.lowercased()). Aim for strain \(Int(target.lowerBound)) to \(Int(target.upperBound))."
+        } ?? head.body
+        var focus = "Nine30 needs a few nights of sleep before it can predict your focus windows."
+        if let s = Focus.schedule(for: t, history: Array(days.suffix(7)), profile: profile) {
+            focus = "Peak focus \(s.peak.start.shortTime) to \(s.peak.end.shortTime). Afternoon dip \(s.dip.start.shortTime) to \(s.dip.end.shortTime)."
+        }
+        TodaySummary(day: DayLogStore.dayKey(t.date), recoveryLine: recovery, focusLine: focus).save()
     }
 
     func dayLog(for date: Date) -> DayLog { logs[DayLogStore.dayKey(date)] ?? DayLog() }

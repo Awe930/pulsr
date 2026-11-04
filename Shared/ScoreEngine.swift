@@ -217,6 +217,55 @@ enum ScoreEngine {
 
     static func strainScale(_ trimp: Double) -> Double { 21 * (1 - exp(-trimp / 125)) }
 
+    // MARK: Training balance (Nine30)
+
+    struct LoadPoint: Identifiable {
+        var id: Date { date }
+        var date: Date
+        var fitness: Double
+        var fatigue: Double
+    }
+
+    struct TrainingBalance {
+        var fitness: Double        // 42-day weighted load (TRIMP/day)
+        var fatigue: Double        // 7-day weighted load
+        var form: Double           // fitness − fatigue
+        var formLabel: String
+        var acwr: Double?          // last 7 days ÷ last 28 days
+        var acwrLabel: String?
+        var series: [LoadPoint]
+    }
+
+    /// Banister-style fitness/fatigue from daily TRIMP, over days that have heart-rate data. Needs 3+ weeks.
+    static func trainingBalance(_ days: [DayScores]) -> TrainingBalance? {
+        guard let first = days.firstIndex(where: { !$0.raw.heartRate.isEmpty }) else { return nil }
+        let span = Array(days[first...])
+        guard span.count >= 21 else { return nil }
+        let loads = span.map { $0.raw.heartRate.isEmpty ? 0 : $0.trimp }
+        let kFit = 1 - exp(-1.0 / 42), kFat = 1 - exp(-1.0 / 7)
+        var fit = loads.prefix(7).reduce(0, +) / 7
+        var fat = fit
+        var series: [LoadPoint] = []
+        for (d, load) in zip(span, loads) {
+            fit += kFit * (load - fit)
+            fat += kFat * (load - fat)
+            series.append(LoadPoint(date: d.date, fitness: fit, fatigue: fat))
+        }
+        let form = fit - fat
+        let rel = fit > 0 ? form / fit : 0
+        let formLabel = rel > 0.1 ? "Fresh" : rel > -0.1 ? "Steady" : rel > -0.3 ? "Productive" : "Overreaching"
+        var acwr: Double?
+        if loads.count >= 28 {
+            let acute = loads.suffix(7).reduce(0, +) / 7
+            let chronic = loads.suffix(28).reduce(0, +) / 28
+            if chronic > 0 { acwr = acute / chronic }
+        }
+        let acwrLabel = acwr.map { r -> String in
+            r < 0.8 ? "Below your usual load" : r <= 1.3 ? "Sweet spot" : r <= 1.5 ? "Ramping fast" : "Spike: injury risk up"
+        }
+        return TrainingBalance(fitness: fit, fatigue: fat, form: form, formLabel: formLabel, acwr: acwr, acwrLabel: acwrLabel, series: series)
+    }
+
     /// TRIMP per minute of strength training (about a steady moderate effort). A judgment call, documented in ALGORITHMS.md.
     static let strengthTrimpPerMinute = 0.6
 

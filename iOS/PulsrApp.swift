@@ -1,4 +1,5 @@
 import SwiftUI
+import AppIntents
 
 @main
 struct PulsrApp: App {
@@ -81,5 +82,42 @@ extension View {
             case .focus: FocusView()
             }
         }
+    }
+}
+
+// MARK: - Siri and Shortcuts (Nine30)
+
+private func todayLine(_ pick: (TodaySummary) -> String) -> String {
+    guard let s = TodaySummary.load() else { return "Open Nine30 once to load your scores." }
+    guard s.day == DayLogStore.dayKey(.now) else { return "Open Nine30 once today to refresh your scores." }
+    return pick(s)
+}
+
+struct RecoveryIntent: AppIntent {
+    static let title: LocalizedStringResource = "Recovery today"
+    static let description = IntentDescription("Today's Nine30 Recovery and strain target.")
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        .result(dialog: IntentDialog(stringLiteral: todayLine { $0.recoveryLine }))
+    }
+}
+
+struct FocusWindowIntent: AppIntent {
+    static let title: LocalizedStringResource = "Focus window today"
+    static let description = IntentDescription("Today's predicted peak focus and afternoon dip.")
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        .result(dialog: IntentDialog(stringLiteral: todayLine { $0.focusLine }))
+    }
+}
+
+struct Nine30Shortcuts: AppShortcutsProvider {
+    static var appShortcuts: [AppShortcut] {
+        AppShortcut(intent: RecoveryIntent(),
+                    phrases: ["What's my recovery in \(.applicationName)", "\(.applicationName) recovery"],
+                    shortTitle: "Recovery", systemImageName: "circle.circle")
+        AppShortcut(intent: FocusWindowIntent(),
+                    phrases: ["When is my focus window in \(.applicationName)", "\(.applicationName) focus window"],
+                    shortTitle: "Focus window", systemImageName: "sun.max")
     }
 }

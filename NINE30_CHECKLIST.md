@@ -22,13 +22,13 @@ Running list for PAK's personal build of Pulsr. Updated with every push.
 - [x] Status switch in the check-in: Normal / Sick / Travel (left out of baselines; sick = strain 0–8)
 - [x] HRV method setting: Morning check-in (RMSSD, default) / Overnight (Apple SDNN)
 
-## Stage 3 · Deeper views (3a pushed Nov 3)
+## Stage 3 · Deeper views (3a and 3b pushed Nov 3)
 - [x] Focus windows vs market hours (Today strip + Focus and energy screen)
-- [ ] Training balance: fitness, fatigue, form, acute:chronic
+- [x] Training balance: fitness, fatigue, form, acute:chronic (Trends tab)
 - [x] Energy through the day
 - [x] Market-hours stress card (tags done in stage 2)
-- [ ] Habit impact with ranges, 10+ days each side, adjusted for prior strain
-- [ ] Siri and Shortcuts (App Intents)
+- [x] Habit impact in points with ~95% ranges, 10+ days each side, adjusted for that day's strain
+- [x] Siri and Shortcuts: recovery and focus window
 
 ## Stage 4 · Wrist
 - [ ] Watch app restyle

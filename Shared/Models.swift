@@ -313,3 +313,21 @@ enum DayLogStore {
         if let data = try? JSONEncoder().encode(logs) { UserDefaults.standard.set(data, forKey: storageKey) }
     }
 }
+
+/// Today's headline in plain sentences, cached for Siri and Shortcuts so they answer without reloading Health data.
+struct TodaySummary: Codable {
+    var day: String
+    var recoveryLine: String
+    var focusLine: String
+
+    private static let storageKey = "nine30.todaySummary"
+
+    static func load() -> TodaySummary? {
+        guard let data = UserDefaults.standard.data(forKey: storageKey) else { return nil }
+        return try? JSONDecoder().decode(TodaySummary.self, from: data)
+    }
+
+    func save() {
+        if let data = try? JSONEncoder().encode(self) { UserDefaults.standard.set(data, forKey: Self.storageKey) }
+    }
+}

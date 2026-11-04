@@ -118,9 +118,16 @@ Starts at your age and adds years for each factor (each clamped):
 
 Total is capped at ±12 years. This is a motivational estimate, not a clinical biomarker.
 
-## Journal impact
+## Journal impact (Nine30)
 
-For each behavior: mean next-day recovery after "yes" days vs. "no" days, as a percentage change. Needs at least 3 of each.
+```
+residual = next-day Recovery − (a + b · that day's Strain)        least-squares fit over all days
+effect   = mean residual on "yes" days − mean residual on "no" days     (points)
+range    = effect ± 2 · √(var_yes / n_yes + var_no / n_no)            about 95%
+```
+
+Needs 10+ "yes" and 10+ "no" days. A tag is "not clear yet" while its range crosses zero. Correlation, not cause.
+(Pulsr compared raw means as a percentage with 3 days each.)
 
 ## Morning check-in and HRV method (Nine30)
 
@@ -169,3 +176,19 @@ Body Battery style, from heart-rate stress: starts at `30 + 0.65 × Recovery` at
 
 Strength workouts add `0.6 TRIMP per minute` on days with heart-rate data, because lifting keeps heart rate low
 while still loading the body. A judgment call to revisit.
+
+## Training balance (Nine30)
+
+Daily load is the day's TRIMP (the number behind Strain), over days with heart-rate data (60 days are loaded).
+
+```
+fitness  += (1 − e^(−1/42)) · (load − fitness)       42-day weighted load
+fatigue  += (1 − e^(−1/7))  · (load − fatigue)       7-day weighted load
+form      = fitness − fatigue;  form/fitness > 0.1 Fresh · > −0.1 Steady · > −0.3 Productive · else Overreaching
+acute:chronic = mean load last 7 days ÷ last 28 days;  0.8–1.3 sweet spot · > 1.5 spike
+```
+
+## Siri and Shortcuts (Nine30)
+
+Each rescore caches today's recovery and focus sentences. "What's my recovery in Nine30" and "When is my focus window
+in Nine30" read that cache, so open the app once a day to refresh it.
