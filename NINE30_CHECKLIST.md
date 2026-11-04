@@ -30,7 +30,7 @@ Running list for PAK's personal build of Pulsr. Updated with every push.
 - [x] Habit impact in points with ~95% ranges, 10+ days each side, adjusted for that day's strain
 - [x] Siri and Shortcuts: recovery and focus window
 
-## Stage 4 · Wrist
+## Stage 4 · Wrist (deferred Nov 3: watch is on watchOS 27; Xcode 26.6 on the 2019 can't install to it. Needs the M2 with ~20 GB free, then XcodeGen for complications)
 - [ ] Watch app restyle
 - [ ] Complications and Smart Stack widget
 
