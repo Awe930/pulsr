@@ -146,6 +146,7 @@ struct TrainingBalanceCard: View {
                         .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 4]))
                 }
                 .chartLegend(.hidden)
+                .chartYScale(domain: yDomain)   // zoom to your range so the two lines' gap is visible
                 .frame(height: 140)
                 HStack(spacing: 14) {
                     Label("Fitness", systemImage: "line.diagonal").foregroundStyle(Color.primary)
@@ -162,6 +163,13 @@ struct TrainingBalanceCard: View {
                 }
             }
         }
+    }
+
+    private var yDomain: ClosedRange<Double> {
+        let values = balance.series.flatMap { [$0.fitness, $0.fatigue] }
+        let lo = values.min() ?? 0, hi = values.max() ?? 1
+        let pad = max((hi - lo) * 0.25, 5)
+        return max(0, lo - pad)...(hi + pad)
     }
 
     private func tile(_ title: String, _ value: Double, _ sub: String) -> some View {
