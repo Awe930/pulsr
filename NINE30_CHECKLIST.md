@@ -53,3 +53,11 @@ Running list for PAK's personal build of Pulsr. Updated with every push.
 - [x] Sleep card shows last night next to the 14-night balance ("Surplus · last +0:41")
 - [x] Surplus nights count at half weight (debt full); revisit with readiness data
 - [x] Strength load: 0.6 TRIMP per strength minute
+
+## Final polish (Nov 3)
+- [x] Journal trimmed to PAK's nine tags: trading day, big loss day, worked late, late meal, phone in bed, morning sunlight, prayed, grateful for something (with a note), time with family or friends
+- [x] Calmer cards: quiet fill and hairline edge; Liquid Glass kept for controls (buttons, tab bar)
+- [x] One accent: no tinted Journal, Body Age or callout cards
+- [x] HRV and resting heart rate charts zoomed to your range
+- [x] Today: Body check, Stress and Market hours in one compact row
+- [x] Today trimmed: 7-day chart (on Trends), Body Age (on Trends) and Tonight's Sleep (bedtime now in the Focus card) removed

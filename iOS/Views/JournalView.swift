@@ -5,22 +5,17 @@ struct Behavior: Identifiable, Hashable {
     var title: String
     var symbol: String
 
+    /// PAK's tags: what actually varies in his days. Old answers for removed tags stay on disk but are no longer shown.
     static let all: [Behavior] = [
         .init(id: "trading_day", title: "Trading day", symbol: "chart.line.uptrend.xyaxis"),
         .init(id: "big_loss_day", title: "Big loss day", symbol: "arrow.down.right"),
-        .init(id: "alcohol", title: "Alcohol", symbol: "wineglass"),
-        .init(id: "caffeine_late", title: "Caffeine after 2 PM", symbol: "cup.and.saucer"),
-        .init(id: "late_meal", title: "Late meal", symbol: "fork.knife"),
-        .init(id: "hydrated", title: "Well hydrated", symbol: "drop"),
-        .init(id: "phone_in_bed", title: "Phone in bed", symbol: "iphone"),
-        .init(id: "read_in_bed", title: "Read in bed", symbol: "book"),
-        .init(id: "meditation", title: "Meditation", symbol: "brain.head.profile"),
-        .init(id: "stretching", title: "Stretching / mobility", symbol: "figure.flexibility"),
-        .init(id: "morning_light", title: "Morning sunlight", symbol: "sun.max"),
-        .init(id: "sauna", title: "Sauna", symbol: "flame"),
-        .init(id: "cold", title: "Cold exposure", symbol: "snowflake"),
         .init(id: "work_late", title: "Worked late", symbol: "laptopcomputer"),
-        .init(id: "magnesium", title: "Magnesium", symbol: "pills"),
+        .init(id: "late_meal", title: "Late meal", symbol: "fork.knife"),
+        .init(id: "phone_in_bed", title: "Phone in bed", symbol: "iphone"),
+        .init(id: "morning_light", title: "Morning sunlight", symbol: "sun.max"),
+        .init(id: "prayed", title: "Prayed", symbol: "hands.sparkles"),
+        .init(id: "grateful", title: "Grateful for something", symbol: "heart"),
+        .init(id: "social", title: "Time with family or friends", symbol: "person.2"),
     ]
 }
 
@@ -36,10 +31,28 @@ final class JournalStore {
         return dir.appendingPathComponent("journal.json")
     }()
 
+    /// Optional one-line notes per day (what you were grateful for).
+    private(set) var notes: [String: String] = [:]
+
+    private let notesURL: URL = {
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return dir.appendingPathComponent("journal-notes.json")
+    }()
+
     init() {
         if let data = try? Data(contentsOf: url), let decoded = try? JSONDecoder().decode([String: [String: Bool]].self, from: data) {
             entries = decoded
         }
+        if let data = try? Data(contentsOf: notesURL), let decoded = try? JSONDecoder().decode([String: String].self, from: data) {
+            notes = decoded
+        }
+    }
+
+    func note(on date: Date) -> String { notes[Self.key(date)] ?? "" }
+
+    func setNote(_ text: String, on date: Date) {
+        notes[Self.key(date)] = text.isEmpty ? nil : text
+        if let data = try? JSONEncoder().encode(notes) { try? data.write(to: notesURL, options: .atomic) }
     }
 
     static func key(_ date: Date) -> String {
@@ -148,7 +161,7 @@ struct JournalView: View {
                 .padding(.top, 8)
 
                 NavigationLink(value: Route.journalInsights) {
-                    GlassCard(tint: Color(hex: 0x6E7BFF)) {
+                    GlassCard {
                         HStack(spacing: 14) {
                             Image(systemName: "chart.bar.xaxis").font(.title2)
                             VStack(alignment: .leading, spacing: 2) {
@@ -169,6 +182,15 @@ struct JournalView: View {
                                 withAnimation(.snappy) { journal.set(b.id, on: date, to: value) }
                             }
                         }
+                    }
+                }
+
+                if journal.answer("grateful", on: date) == true {
+                    GlassCard(padding: 14) {
+                        TextField("What are you grateful for?",
+                                  text: Binding(get: { journal.note(on: date) }, set: { journal.setNote($0, on: date) }),
+                                  axis: .vertical)
+                            .lineLimit(1...4)
                     }
                 }
             }
@@ -196,7 +218,7 @@ struct BehaviorRow: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .glassEffect(.regular, in: .rect(cornerRadius: 20))
+        .cardSurface(cornerRadius: 20)
     }
 
     private func choice(_ title: String, selected: Bool, color: Color, action: @escaping () -> Void) -> some View {
@@ -273,7 +295,7 @@ struct ImpactRow: View {
                 .frame(height: 14)
         }
         .padding(16)
-        .glassEffect(.regular, in: .rect(cornerRadius: 20))
+        .cardSurface(cornerRadius: 20)
     }
 }
 

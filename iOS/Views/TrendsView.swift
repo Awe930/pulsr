@@ -77,7 +77,7 @@ struct TrendsView: View {
                 }
                 if store.bodyAge != nil {
                     NavigationLink(value: Route.bodyAge) {
-                        GlassCard(tint: Theme.green) {
+                        GlassCard {
                             HStack {
                                 Label("Healthspan & Body Age", systemImage: "hourglass")
                                     .font(.headline)
@@ -118,7 +118,7 @@ struct TrendsView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 16)
-        .glassEffect(.regular, in: .rect(cornerRadius: 22))
+        .cardSurface(cornerRadius: 22)
     }
 }
 

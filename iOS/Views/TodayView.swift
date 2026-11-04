@@ -17,14 +17,10 @@ struct TodayView: View {
                     insight(day)
                     if store.isToday { checkInCard(day) }
                     focusCard(day)
-                    monitors(day)
-                    marketCard(day)
+                    statusRow(day)
                     if store.isToday { planCard() }
                     SectionTitle(title: "My Day")
                     activities(day)
-                    if store.isToday { tonight(day) }
-                    weekChart
-                    bodyAgeTeaser
                 } else if store.isLoading {
                     ProgressView().padding(.top, 120)
                 } else {
@@ -231,6 +227,16 @@ struct TodayView: View {
                         }
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        if store.isToday {
+                            let need = ScoreEngine.sleepNeed(profile: store.profile, previousStrain: d.strain, debt: d.sleepDebt)
+                            HStack {
+                                Text("Wind down \(s.windDown.shortTime) · bed \(s.bedtime.shortTime)")
+                                Spacer()
+                                Text("Need \(need.hoursMinutes)")
+                            }
+                            .font(.caption)
+                            .foregroundStyle(Theme.sleep[0])
+                        }
                     }
                 }
             }
@@ -260,6 +266,46 @@ struct TodayView: View {
             }
             .buttonStyle(.plain)
         }
+    }
+
+    /// Body check, stress and market hours in one compact row; each cell opens its detail.
+    private func statusRow(_ d: DayScores) -> some View {
+        let health = HealthMonitor.metrics(for: d)
+        let off = health.filter { !$0.inRange }.count
+        let stress = d.latestStress
+        let market = Focus.marketStress(d, session: Focus.marketSession(on: d.date))
+        return GlassCard(padding: 14) {
+            HStack(alignment: .top, spacing: 0) {
+                NavigationLink(value: Route.healthMonitor) {
+                    statusCell("Body check", off == 0 ? "All typical" : "\(off) out of range",
+                               "\(health.count - off) of \(health.count) vitals", off == 0 ? Theme.green : Theme.hurts)
+                }
+                Divider().frame(height: 44).opacity(0.4)
+                NavigationLink(value: Route.stress) {
+                    statusCell("Stress", stress.map { StressLevel($0).rawValue } ?? "No data",
+                               stress.map { "\($0.oneDecimal) · \(d.stress.last?.date.shortTime ?? "")" } ?? "—",
+                               Theme.stressColor(stress ?? 0))
+                }
+                Divider().frame(height: 44).opacity(0.4)
+                NavigationLink(value: Route.focus) {
+                    statusCell("Market", market.map { "\($0.average.oneDecimal) avg" } ?? "Closed",
+                               market.map { "peak \($0.peak.level.oneDecimal) · \($0.peak.date.shortTime)" } ?? "No session yet",
+                               Color.primary)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func statusCell(_ title: String, _ value: String, _ detail: String, _ color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            Text(value).font(.subheadline.weight(.semibold)).foregroundStyle(color).lineLimit(1).minimumScaleFactor(0.75)
+            Text(detail).font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 8)
+        .contentShape(.rect)
     }
 
     @ViewBuilder private func planCard() -> some View {
@@ -446,7 +492,7 @@ struct MetricCapsule: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 11)
-        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 24))
+        .cardSurface(cornerRadius: 24)
     }
 }
 
@@ -471,7 +517,7 @@ struct RingTile: View {
         }
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity)
-        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 26))
+        .cardSurface(cornerRadius: 26)
     }
 }
 

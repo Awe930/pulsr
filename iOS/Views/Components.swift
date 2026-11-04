@@ -1,6 +1,20 @@
 import SwiftUI
 
-// MARK: - Glass surfaces
+// MARK: - Surfaces
+
+extension View {
+    /// Content cards get a quiet fill and a hairline edge; Liquid Glass stays on controls (buttons, tab bar), as Apple intends.
+    func cardSurface(cornerRadius: CGFloat, tint: Color? = nil) -> some View {
+        background(
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill((tint ?? Color.primary).opacity(tint == nil ? 0.05 : 0.12))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
+        )
+    }
+}
 
 struct GlassCard<Content: View>: View {
     var cornerRadius: CGFloat = 28
@@ -12,7 +26,7 @@ struct GlassCard<Content: View>: View {
         content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glassEffect(tint.map { Glass.regular.tint($0.opacity(0.18)) } ?? .regular, in: .rect(cornerRadius: cornerRadius))
+            .cardSurface(cornerRadius: cornerRadius, tint: tint)
     }
 }
 
@@ -89,7 +103,7 @@ struct ConfidenceChip: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .glassEffect(.regular, in: .capsule)
+        .cardSurface(cornerRadius: 100)
         .accessibilityElement(children: .combine)
     }
 }
@@ -216,11 +230,7 @@ struct InsightCallout: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular.tint(Color(hex: 0x6E7BFF).opacity(0.12)), in: .rect(cornerRadius: 22))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22)
-                .strokeBorder(LinearGradient(colors: [Color(hex: 0x6E7BFF).opacity(0.7), Color(hex: 0x2FD4FF).opacity(0.3)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
-        }
+        .cardSurface(cornerRadius: 22)
     }
 }
 

@@ -303,10 +303,18 @@ struct TrendLine: View {
     var color: Color
     var unit: String
 
+    /// Zoomed to your values (and baseline) so day-to-day movement shows.
+    private var domain: ClosedRange<Double> {
+        let values = points.map(\.value) + (baseline.map { [$0] } ?? [])
+        let lo = values.min() ?? 0, hi = values.max() ?? 1
+        let pad = max((hi - lo) * 0.2, 2)
+        return (lo - pad)...(hi + pad)
+    }
+
     var body: some View {
         Chart {
             ForEach(points) { p in
-                AreaMark(x: .value("Day", p.date, unit: .day), y: .value(unit, p.value))
+                AreaMark(x: .value("Day", p.date, unit: .day), yStart: .value(unit, domain.lowerBound), yEnd: .value(unit, p.value))
                     .foregroundStyle(LinearGradient(colors: [color.opacity(0.35), color.opacity(0)], startPoint: .top, endPoint: .bottom))
                     .interpolationMethod(.catmullRom)
                 LineMark(x: .value("Day", p.date, unit: .day), y: .value(unit, p.value))
@@ -320,7 +328,7 @@ struct TrendLine: View {
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
             }
         }
-        .chartYScale(domain: .automatic(includesZero: false))
+        .chartYScale(domain: domain)
         .chartXAxis { AxisMarks(values: .stride(by: .day, count: 7)) { _ in AxisValueLabel(format: .dateTime.month(.abbreviated).day()) } }
     }
 }
