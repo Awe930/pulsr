@@ -3,6 +3,8 @@ import Charts
 
 struct TodayView: View {
     @Environment(MetricsStore.self) private var store
+    @Environment(JournalStore.self) private var journal
+    @AppStorage("nine30.tab") private var tab = 0
     @State private var showSettings = false
     @State private var showCheckIn = false
 
@@ -11,16 +13,26 @@ struct TodayView: View {
         ScrollView {
             VStack(spacing: 16) {
                 header
+                if let line = Signing.line {
+                    Text(line)
+                        .font(.caption)
+                        .foregroundStyle((Signing.daysLeft ?? 9) <= 1 ? Theme.hurts : .secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, -6)
+                }
                 if let day {
+                    // Check-in leads the morning, then steps aside once it's done.
+                    if store.isToday && store.dayLog(for: day.date).checkedInAt == nil { checkInCard(day) }
                     rings(day)
                     bodyCheckAlert(day)
-                    insight(day)
-                    if store.isToday { checkInCard(day) }
                     focusCard(day)
                     statusRow(day)
                     if store.isToday { planCard() }
-                    SectionTitle(title: "My Day")
-                    activities(day)
+                    journalRow(day)
+                    if day.raw.sleep != nil || !day.raw.workouts.isEmpty {
+                        SectionTitle(title: "My Day")
+                        activities(day)
+                    }
                 } else if store.isLoading {
                     ProgressView().padding(.top, 120)
                 } else {
@@ -104,6 +116,11 @@ struct TodayView: View {
                          + Text(Insights.headline(d).title).foregroundStyle(Theme.recoveryColor(d.recovery)).fontWeight(.semibold))
                             .font(.subheadline)
                             .padding(.top, 8)
+                        // One-line verdict; the full explanation is a tap away on the Recovery screen.
+                        Text(verdictLine(d))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 4)
                         ConfidenceChip(level: d.confidence, detail: d.confidenceDetail, tint: Theme.recoveryColor(d.recovery))
                             .padding(.top, 10)
                     }
@@ -134,6 +151,21 @@ struct TodayView: View {
             .padding(.top, 20)
         }
         .buttonStyle(.plain)
+    }
+
+    private func verdictLine(_ d: DayScores) -> String {
+        if d.status == .sick { return "Rest day · strain target lowered" }
+        var parts: [String] = []
+        switch d.hrvStatus {
+        case .typical?: parts.append("HRV in range")
+        case .below?: parts.append("HRV below range")
+        case .above?: parts.append("HRV above range")
+        case nil: break
+        }
+        if d.status == .travel { parts.append("travel day") }
+        if d.isCalibrating { parts.append("calibrating") }
+        parts.append("tap for why")
+        return parts.joined(separator: " · ")
     }
 
     // MARK: Cards
@@ -316,6 +348,10 @@ struct TodayView: View {
                         Text("Followed the plan").font(.headline)
                         Text("Strain inside the day's target, rest days included · \(p.hits) of last \(p.days) days")
                             .font(.caption).foregroundStyle(.secondary)
+                        if p.current == 0, let strain = p.lastStrain, let t = p.lastTarget {
+                            Text("Yesterday \(strain.oneDecimal), aim was \(Int(t.lowerBound))–\(Int(t.upperBound))")
+                                .font(.caption).foregroundStyle(Theme.hurts)
+                        }
                     }
                     Spacer()
                     VStack(spacing: 0) {
@@ -325,6 +361,49 @@ struct TodayView: View {
                 }
             }
         }
+    }
+
+    /// Today's yes answers as icons, yesterday's gratitude note, and the clearest habit effect so far.
+    @ViewBuilder private func journalRow(_ d: DayScores) -> some View {
+        let yes = Behavior.all.filter { journal.answer($0.id, on: d.date) == true }
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: d.date) ?? d.date
+        let note = journal.note(on: yesterday)
+        let clearest = journal.impacts(days: Array(store.days.suffix(90)), demo: store.source == .demo)
+            .filter(\.isClear)
+            .max { abs($0.points) < abs($1.points) }
+        Button { tab = 2 } label: {
+            GlassCard(padding: 16) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
+                        Text("Journal").font(.headline)
+                        if yes.isEmpty {
+                            Text(store.isToday ? "Not filled in yet" : "Nothing logged").font(.caption).foregroundStyle(.secondary)
+                        } else {
+                            HStack(spacing: 8) {
+                                ForEach(yes) { b in
+                                    Image(systemName: b.symbol).font(.caption).foregroundStyle(.secondary)
+                                        .accessibilityLabel(b.title)
+                                }
+                            }
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                    }
+                    if !note.isEmpty {
+                        Text("Grateful yesterday: \(note)")
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    if let c = clearest {
+                        let n = Int(abs(c.points).rounded())
+                        Text("\(c.behavior.title): about \(n) \(c.points >= 0 ? "more" : "fewer") Recovery points")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(c.points >= 0 ? Theme.helps : Theme.hurts)
+                            .lineLimit(1).minimumScaleFactor(0.85)
+                    }
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private func monitors(_ d: DayScores) -> some View {

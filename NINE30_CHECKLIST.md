@@ -39,6 +39,11 @@ Running list for PAK's personal build of Pulsr. Updated with every push.
 - [x] Resilience (14-day balance, Trends tab)
 - [x] "Followed the plan" streak (Today)
 - [x] Reminders: wind down (1 h before bedtime) and morning check-in (30 min after waking); caffeine cutoff skipped by PAK
+- [x] Reminders v2: wind down at 60 and 15 min before bed; check-in at +30/+45/+60 min after typical wake, stops once checked in
+- [x] Today reorder: check-in first (until done), ring with one-line verdict, focus, status row, plan, journal row, My Day (hidden when empty)
+- [x] Re-sign countdown under the date (from the provisioning profile) plus notifications on the last two days
+- [x] Zero plan streak explains itself ("Yesterday 15.8, aim was 10–14")
+- [x] Journal row on Today: yes-tag icons, yesterday's gratitude note, clearest habit effect; tap opens the Journal tab
 
 ## Fixes from first live run (Nov 3)
 - [x] 30-day Avg Strain was diluted by days with no heart-rate data (only 14 days loaded); now loads 35 days and skips empty days

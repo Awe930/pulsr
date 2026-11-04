@@ -19,8 +19,8 @@ struct SettingsView: View {
                     .pickerStyle(.segmented)
                 }
                 Section {
-                    Toggle("Wind down, 1 h before bedtime", isOn: $windDownReminder)
-                    Toggle("Morning check-in, 30 min after waking", isOn: $checkInReminder)
+                    Toggle("Wind down, 1 h and 15 min before bed", isOn: $windDownReminder)
+                    Toggle("Morning check-in, 30 min after waking (up to 3 times)", isOn: $checkInReminder)
                 } header: {
                     Text("Reminders")
                 } footer: {

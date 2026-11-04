@@ -37,7 +37,7 @@ struct RecoveryDetailView: View {
                             .padding(.top, 6)
                     }
                 }
-                InsightCallout(text: recoveryExplanation(d))
+                InsightCallout(text: Insights.headline(d).body + "\n\n" + recoveryExplanation(d))
                 GlassCard {
                     VStack(alignment: .leading, spacing: 12) {
                         Eyebrow(text: "Recovery · 14 days")

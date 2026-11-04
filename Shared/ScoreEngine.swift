@@ -307,6 +307,9 @@ enum ScoreEngine {
         var current: Int
         var hits: Int
         var days: Int
+        /// The last finished day, so a zero streak can say why.
+        var lastStrain: Double? = nil
+        var lastTarget: ClosedRange<Double>? = nil
     }
 
     /// A day counts when its strain landed inside that day's target (±1), rest days included. Today is still open, so it's left out.
@@ -322,7 +325,8 @@ enum ScoreEngine {
             if followed(d) { current += 1 } else { break }
         }
         let recent = Array(done.suffix(14))
-        return PlanStreak(current: current, hits: recent.filter(followed).count, days: recent.count)
+        return PlanStreak(current: current, hits: recent.filter(followed).count, days: recent.count,
+                          lastStrain: done.last?.strain, lastTarget: done.last.map { strainTarget(for: $0) })
     }
 
     /// TRIMP per minute of strength training (about a steady moderate effort). A judgment call, documented in ALGORITHMS.md.
