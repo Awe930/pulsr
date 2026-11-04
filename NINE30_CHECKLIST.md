@@ -50,3 +50,4 @@ Running list for PAK's personal build of Pulsr. Updated with every push.
 - [x] Appearance setting: Match phone / Light / Dark (Settings, top section)
 - [x] Confidence chip shortened to one line ("3 readings · 30 nights")
 - [x] Journal: Trading day and Big loss day tags
+- [x] Sleep card shows last night next to the 14-night balance ("Surplus · last +0:41")

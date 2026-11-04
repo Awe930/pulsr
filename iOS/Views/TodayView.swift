@@ -117,10 +117,13 @@ struct TodayView: View {
                     NavigationLink(value: Route.sleep) {
                         // Sleep balance against your goal: debt (purple), on target, or surplus (blue). Ring is full at 3 h either way.
                         let hours = d.sleepBalance / 3600
+                        // Last night on its own, next to the 14-night balance: trend and single night together.
+                        let lastNight = d.raw.sleep.map { $0.asleep - store.profile.sleepGoalHours * 3600 }
+                        let lastText = lastNight.map { " · last \($0 < 0 ? "−" : "+")\(abs($0).hoursMinutes)" } ?? ""
                         MetricCapsule(progress: min(abs(hours) / 3, 1),
                                       color: hours < 0 ? Theme.sleep[0] : Theme.strain[0],
                                       value: d.sleepOnTarget ? "On target" : "\(hours < 0 ? "−" : "+")\(String(format: "%.1f", abs(hours))) h",
-                                      title: d.sleepOnTarget ? "Sleep balance" : hours < 0 ? "Sleep debt" : "Sleep surplus")
+                                      title: (d.sleepOnTarget ? "Balance" : hours < 0 ? "Debt" : "Surplus") + lastText)
                     }
                     NavigationLink(value: Route.strain) {
                         let target = ScoreEngine.strainTarget(for: d)
