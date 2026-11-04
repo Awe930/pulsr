@@ -6,6 +6,8 @@ struct SettingsView: View {
     @State private var draft = UserProfile()
     @State private var customMaxHR = false
     @AppStorage(Appearance.storageKey) private var appearance = Appearance.system.rawValue
+    @AppStorage(Nudges.windDownKey) private var windDownReminder = true
+    @AppStorage(Nudges.checkInKey) private var checkInReminder = true
 
     var body: some View {
         NavigationStack {
@@ -16,6 +18,16 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.segmented)
                 }
+                Section {
+                    Toggle("Wind down, 1 h before bedtime", isOn: $windDownReminder)
+                    Toggle("Morning check-in, 30 min after waking", isOn: $checkInReminder)
+                } header: {
+                    Text("Reminders")
+                } footer: {
+                    Text("Times come from your sleep schedule and update each time you open Nine30. The check-in reminder is skipped once you've checked in.")
+                }
+                .onChange(of: windDownReminder) { _, _ in Task { await Nudges.refresh(store) } }
+                .onChange(of: checkInReminder) { _, _ in Task { await Nudges.refresh(store) } }
                 Section("Profile") {
                     TextField("Name", text: $draft.name)
                     Stepper("Age: \(draft.age)", value: $draft.age, in: 14...99)

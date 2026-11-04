@@ -26,6 +26,9 @@ struct TrendsView: View {
                 if let balance = ScoreEngine.trainingBalance(store.days) {
                     TrainingBalanceCard(balance: balance)
                 }
+                if let resilience = ScoreEngine.resilience(store.days) {
+                    ResilienceCard(resilience: resilience)
+                }
 
                 GlassCard {
                     VStack(alignment: .leading, spacing: 12) {
@@ -179,5 +182,50 @@ struct TrainingBalanceCard: View {
             Text(sub).font(.caption2).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// 14-day resilience: recovery, calm while awake, and sleep, with the change from the 14 days before.
+struct ResilienceCard: View {
+    var resilience: ScoreEngine.Resilience
+
+    var body: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline) {
+                    Eyebrow(text: "Resilience · 14 days")
+                    Spacer()
+                    if let change = resilience.change {
+                        Text(change >= 0 ? "+\(Int(change.rounded())) vs prior 14" : "\(Int(change.rounded())) vs prior 14")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(change < -5 ? Theme.hurts : .secondary)
+                    }
+                }
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(resilience.level).font(.title2.weight(.semibold))
+                    Text("\(Int(resilience.score.rounded()))").font(.title3).foregroundStyle(.secondary).monospacedDigit()
+                }
+                part("Recovery", resilience.recoveryPart)
+                part("Calm while awake", resilience.calmPart)
+                part("Sleep", resilience.sleepPart)
+                Text("How well you've been balancing stress and recovery over two weeks. Slower and steadier than a daily score.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func part(_ title: String, _ value: Double) -> some View {
+        HStack(spacing: 10) {
+            Text(title).font(.caption).frame(width: 118, alignment: .leading)
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.primary.opacity(0.08))
+                    Capsule().fill(Color.primary.opacity(0.7))
+                        .frame(width: max(geo.size.width * CGFloat(value.clamped(0, 100) / 100), 4))
+                }
+            }
+            .frame(height: 6)
+            Text("\(Int(value.rounded()))").font(.caption).monospacedDigit().frame(width: 28, alignment: .trailing)
+        }
     }
 }

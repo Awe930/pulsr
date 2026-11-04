@@ -266,6 +266,65 @@ enum ScoreEngine {
         return TrainingBalance(fitness: fit, fatigue: fat, form: form, formLabel: formLabel, acwr: acwr, acwrLabel: acwrLabel, series: series)
     }
 
+    // MARK: Resilience and plan streak (Nine30)
+
+    struct Resilience {
+        var score: Double          // 0...100
+        var level: String
+        var recoveryPart: Double   // average Recovery over 14 days
+        var calmPart: Double       // 100 = no time in high stress while awake
+        var sleepPart: Double      // 100 = no sleep debt
+        var change: Double?        // vs. the 14 days before
+    }
+
+    /// Oura-style 14-day balance of strain on the system and recovery from it. Needs 10+ days with Recovery.
+    static func resilience(_ days: [DayScores]) -> Resilience? {
+        func compute(_ window: [DayScores]) -> (score: Double, rec: Double, calm: Double, sleep: Double)? {
+            let recs = window.compactMap(\.recovery)
+            guard recs.count >= 10 else { return nil }
+            let rec = recs.reduce(0, +) / Double(recs.count)
+            var high = 0, total = 0
+            for d in window {
+                for p in d.stress where !(d.raw.sleep.map { $0.start <= p.date && p.date <= $0.end } ?? false) {
+                    total += 1
+                    if p.level >= 2 { high += 1 }
+                }
+            }
+            let calm = total > 0 ? 100 * (1 - min(Double(high) / Double(total) * 2.5, 1)) : 70
+            let balanceHours = (window.last?.sleepBalance ?? 0) / 3600
+            let sleep = balanceHours >= 0 ? 100 : max(0, 100 + balanceHours * 25)
+            return (0.5 * rec + 0.3 * calm + 0.2 * sleep, rec, calm, sleep)
+        }
+        guard let now = compute(Array(days.suffix(14))) else { return nil }
+        let before = days.count >= 28 ? compute(Array(days.dropLast(14).suffix(14))) : nil
+        let s = now.score
+        let level = s >= 80 ? "Exceptional" : s >= 68 ? "Strong" : s >= 56 ? "Solid" : s >= 44 ? "Adequate" : "Limited"
+        return Resilience(score: s, level: level, recoveryPart: now.rec, calmPart: now.calm, sleepPart: now.sleep,
+                          change: before.map { s - $0.score })
+    }
+
+    struct PlanStreak {
+        var current: Int
+        var hits: Int
+        var days: Int
+    }
+
+    /// A day counts when its strain landed inside that day's target (±1), rest days included. Today is still open, so it's left out.
+    static func planStreak(_ days: [DayScores]) -> PlanStreak? {
+        let done = Array(days.dropLast()).filter { !$0.raw.heartRate.isEmpty }
+        guard !done.isEmpty else { return nil }
+        let followed: (DayScores) -> Bool = { d in
+            let t = strainTarget(for: d)
+            return d.strain >= t.lowerBound - 1 && d.strain <= t.upperBound + 1
+        }
+        var current = 0
+        for d in done.reversed() {
+            if followed(d) { current += 1 } else { break }
+        }
+        let recent = Array(done.suffix(14))
+        return PlanStreak(current: current, hits: recent.filter(followed).count, days: recent.count)
+    }
+
     /// TRIMP per minute of strength training (about a steady moderate effort). A judgment call, documented in ALGORITHMS.md.
     static let strengthTrimpPerMinute = 0.6
 

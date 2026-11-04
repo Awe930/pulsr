@@ -36,9 +36,9 @@ Running list for PAK's personal build of Pulsr. Updated with every push.
 
 ## After 4–6 weeks of live use
 - [ ] Fit Recovery weights to check-in ratings
-- [ ] Resilience (14-day balance)
-- [ ] "Followed the plan" streak
-- [ ] Timed nudges (caffeine cutoff, light, wind-down)
+- [x] Resilience (14-day balance, Trends tab)
+- [x] "Followed the plan" streak (Today)
+- [x] Reminders: wind down (1 h before bedtime) and morning check-in (30 min after waking); caffeine cutoff skipped by PAK
 
 ## Fixes from first live run (Nov 3)
 - [x] 30-day Avg Strain was diluted by days with no heart-rate data (only 14 days loaded); now loads 35 days and skips empty days

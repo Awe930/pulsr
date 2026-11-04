@@ -192,3 +192,25 @@ acute:chronic = mean load last 7 days ÷ last 28 days;  0.8–1.3 sweet spot · 
 
 Each rescore caches today's recovery and focus sentences. "What's my recovery in Nine30" and "When is my focus window
 in Nine30" read that cache, so open the app once a day to refresh it.
+
+## Resilience (Nine30)
+
+Oura-style 14-day balance, a judgment-call blend:
+
+```
+recovery = mean Recovery over 14 days                      (needs 10+ days)
+calm     = 100 × (1 − min(2.5 × share of waking stress readings ≥ 2, 1))
+sleep    = 100 if sleep balance ≥ 0, else 100 + 25 × balance hours  (floor 0)
+score    = 0.5·recovery + 0.3·calm + 0.2·sleep
+levels   ≥ 80 Exceptional · ≥ 68 Strong · ≥ 56 Solid · ≥ 44 Adequate · else Limited
+```
+
+## Followed the plan (Nine30)
+
+A finished day counts when its strain landed within its target ±1 (sick days: 0–8). The streak is consecutive counted
+days up to yesterday; the card also shows hits over the last 14 days.
+
+## Reminders (Nine30)
+
+Wind down: 1 h before tonight's recommended bedtime. Morning check-in: 30 min after your 7-night typical wake time,
+skipped once today's check-in is saved. Both are rescheduled whenever the app opens.

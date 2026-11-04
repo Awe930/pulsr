@@ -1,5 +1,6 @@
 import SwiftUI
 import AppIntents
+import UserNotifications
 
 @main
 struct PulsrApp: App {
@@ -16,9 +17,19 @@ struct PulsrApp: App {
                 .environment(journal)
                 .environment(coach)
                 .preferredColorScheme((Appearance(rawValue: appearance) ?? .system).colorScheme)
-                .task { if store.hasOnboarded { await store.load() } }
+                .task {
+                    if store.hasOnboarded {
+                        await store.load()
+                        await Nudges.refresh(store)
+                    }
+                }
                 .onChange(of: scenePhase) { _, phase in
-                    if phase == .active, store.hasOnboarded { Task { await store.load() } }
+                    if phase == .active, store.hasOnboarded {
+                        Task {
+                            await store.load()
+                            await Nudges.refresh(store)
+                        }
+                    }
                 }
         }
     }
@@ -119,5 +130,55 @@ struct Nine30Shortcuts: AppShortcutsProvider {
         AppShortcut(intent: FocusWindowIntent(),
                     phrases: ["When is my focus window in \(.applicationName)", "\(.applicationName) focus window"],
                     shortTitle: "Focus window", systemImageName: "sun.max")
+    }
+}
+
+// MARK: - Reminders (Nine30)
+
+/// Two local reminders, rescheduled every time the app opens: wind down 1 h before tonight's bedtime, and the
+/// morning check-in 30 min after your usual wake time (skipped once today's check-in is done).
+@MainActor
+enum Nudges {
+    static let windDownKey = "nine30.nudge.windDown"
+    static let checkInKey = "nine30.nudge.checkIn"
+    private static let ids = ["nine30.winddown", "nine30.checkin.today", "nine30.checkin.tomorrow"]
+
+    static func refresh(_ store: MetricsStore) async {
+        let defaults = UserDefaults.standard
+        let windDownOn = defaults.object(forKey: windDownKey) as? Bool ?? true
+        let checkInOn = defaults.object(forKey: checkInKey) as? Bool ?? true
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: ids)
+        guard windDownOn || checkInOn else { return }
+        let granted = (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
+        guard granted, let today = store.today else { return }
+        let recent = Array(store.days.suffix(7))
+
+        if windDownOn, let s = Focus.schedule(for: today, history: recent, profile: store.profile), s.windDown > .now {
+            schedule(center, id: "nine30.winddown", at: s.windDown, title: "Wind down",
+                     body: "Bedtime is \(s.bedtime.shortTime). Screens down, lights low.")
+        }
+        if checkInOn, let wake = Focus.typicalWakeMinutes(recent) {
+            let cal = Calendar.current
+            let todayTime = cal.startOfDay(for: .now).addingTimeInterval((wake + 30) * 60)
+            let body = "One minute of Breathe on your watch, then rate how you feel."
+            if store.dayLog(for: .now).checkedInAt == nil, todayTime > .now {
+                schedule(center, id: "nine30.checkin.today", at: todayTime, title: "Morning check-in", body: body)
+            }
+            if let tomorrow = cal.date(byAdding: .day, value: 1, to: todayTime) {
+                schedule(center, id: "nine30.checkin.tomorrow", at: tomorrow, title: "Morning check-in", body: body)
+            }
+        }
+    }
+
+    private static func schedule(_ center: UNUserNotificationCenter, id: String, at date: Date, title: String, body: String) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        let parts = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+        let request = UNNotificationRequest(identifier: id, content: content,
+                                            trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false))
+        center.add(request, withCompletionHandler: nil)
     }
 }

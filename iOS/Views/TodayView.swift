@@ -19,6 +19,7 @@ struct TodayView: View {
                     focusCard(day)
                     monitors(day)
                     marketCard(day)
+                    if store.isToday { planCard() }
                     SectionTitle(title: "My Day")
                     activities(day)
                     if store.isToday { tonight(day) }
@@ -258,6 +259,25 @@ struct TodayView: View {
                 }
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder private func planCard() -> some View {
+        if let p = ScoreEngine.planStreak(store.days) {
+            GlassCard(padding: 16) {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Followed the plan").font(.headline)
+                        Text("Strain inside the day's target, rest days included · \(p.hits) of last \(p.days) days")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    VStack(spacing: 0) {
+                        Text("\(p.current)").font(.title2.weight(.semibold)).monospacedDigit()
+                        Text(p.current == 1 ? "day" : "days").font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+            }
         }
     }
 
@@ -703,6 +723,7 @@ struct CheckInView: View {
             entry.morningBeats = b
             entry.checkedInAt = .now
         }
+        Task { await Nudges.refresh(store) }
     }
 }
 
