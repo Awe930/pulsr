@@ -57,7 +57,7 @@ enum Appearance: String, CaseIterable, Identifiable {
 }
 
 enum Route: Hashable {
-    case recovery, sleep, strain, stress, bodyAge, healthMonitor, journalInsights, focus
+    case recovery, sleep, strain, stress, bodyAge, healthMonitor, journalInsights, focus, week
 }
 
 struct RootView: View {
@@ -93,6 +93,7 @@ extension View {
             case .healthMonitor: HealthMonitorView()
             case .journalInsights: JournalInsightsView()
             case .focus: FocusView()
+            case .week: WeekReviewView()
             }
         }
     }

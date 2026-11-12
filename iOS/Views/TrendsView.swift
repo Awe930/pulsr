@@ -21,6 +21,20 @@ struct TrendsView: View {
                 }
                 .pickerStyle(.segmented)
 
+                NavigationLink(value: Route.week) {
+                    GlassCard(padding: 16) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Week in review").font(.headline)
+                                Text("Last 7 days vs the 7 before").font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+
                 averages(days)
 
                 if let balance = ScoreEngine.trainingBalance(store.days) {
@@ -29,6 +43,7 @@ struct TrendsView: View {
                 if let resilience = ScoreEngine.resilience(store.days) {
                     ResilienceCard(resilience: resilience)
                 }
+                FeltAgreementCard(agreement: ScoreEngine.feltAgreement(Array(store.days.suffix(60)), logs: store.logs))
 
                 GlassCard {
                     VStack(alignment: .leading, spacing: 12) {
@@ -227,5 +242,79 @@ struct ResilienceCard: View {
             .frame(height: 6)
             Text("\(Int(value.rounded()))").font(.caption).monospacedDigit().frame(width: 28, alignment: .trailing)
         }
+    }
+}
+
+/// Does Recovery match how you said you felt? Each dot is a morning check-in.
+struct FeltAgreementCard: View {
+    var agreement: ScoreEngine.FeltAgreement
+
+    var body: some View {
+        let n = agreement.pairs.count
+        GlassCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline) {
+                    Eyebrow(text: "Recovery vs how you felt")
+                    Spacer()
+                    Text("\(n) \(n == 1 ? "morning" : "mornings")").font(.caption).foregroundStyle(.secondary)
+                }
+                Text(headline).font(.headline)
+                if n > 0 {
+                    Chart {
+                        ForEach(agreement.pairs) { p in
+                            PointMark(x: .value("Felt", Double(p.felt)), y: .value("Recovery", p.recovery))
+                                .foregroundStyle(Theme.recoveryColor(p.recovery).opacity(0.8))
+                                .symbolSize(40)
+                        }
+                        ForEach(agreement.averages.keys.sorted(), id: \.self) { felt in
+                            if let avg = agreement.averages[felt] {
+                                LineMark(x: .value("Felt", Double(felt)), y: .value("Average", avg))
+                                    .foregroundStyle(Color.primary.opacity(0.6))
+                                    .interpolationMethod(.linear)
+                            }
+                        }
+                    }
+                    .chartXScale(domain: 0.5...5.5)
+                    .chartYScale(domain: 0...100)
+                    .chartXAxis {
+                        AxisMarks(values: [1.0, 2.0, 3.0, 4.0, 5.0]) { v in
+                            AxisGridLine()
+                            AxisValueLabel { Text("\(Int(v.as(Double.self) ?? 0))") }
+                        }
+                    }
+                    .frame(height: 160)
+                }
+                Text(detail).font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var headline: String {
+        guard let r = agreement.r else {
+            return "Learning: \(agreement.pairs.count) of \(ScoreEngine.FeltAgreement.minimum) check-ins"
+        }
+        switch r {
+        case 0.5...: return "Recovery matches how you feel"
+        case 0.25..<0.5: return "Recovery loosely matches how you feel"
+        default: return "Recovery and how you feel don't line up yet"
+        }
+    }
+
+    private var detail: String {
+        func mean(_ keys: [Int]) -> Double? {
+            let values = agreement.pairs.filter { keys.contains($0.felt) }.map(\.recovery)
+            return values.isEmpty ? nil : values.reduce(0, +) / Double(values.count)
+        }
+        guard agreement.r != nil else {
+            return "Rate how you feel at each morning check-in. After 7 mornings this shows whether Recovery tracks it. Each dot is one morning; the line is the average for each rating."
+        }
+        var text = ""
+        if let high = mean([4, 5]), let low = mean([1, 2]) {
+            text = "Felt 4–5: Recovery averaged \(high.percent)%. Felt 1–2: \(low.percent)%. "
+        } else if let high = mean([4, 5]), let mid = mean([3]) {
+            text = "Felt 4–5: Recovery averaged \(high.percent)%. Felt 3: \(mid.percent)%. "
+        }
+        text += "Correlation \(String(format: "%.2f", agreement.r ?? 0)). The Recovery auto-fit will use these same mornings once there are 30."
+        return text
     }
 }

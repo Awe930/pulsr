@@ -29,6 +29,22 @@ struct TodayView: View {
                     statusRow(day)
                     if store.isToday { planCard() }
                     journalRow(day)
+                    // Sunday evening and Monday: a nudge to look back at the week.
+                    if store.isToday && [1, 2].contains(Calendar.current.component(.weekday, from: .now)) {
+                        NavigationLink(value: Route.week) {
+                            GlassCard(padding: 16) {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text("Your week in review").font(.headline)
+                                        Text("Recovery, sleep, plan and journal, vs the week before").font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
                     if day.raw.sleep != nil || !day.raw.workouts.isEmpty {
                         SectionTitle(title: "My Day")
                         activities(day)

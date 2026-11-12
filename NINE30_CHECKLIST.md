@@ -34,6 +34,8 @@ Running list for PAK's personal build of Pulsr. Updated with every push.
 
 ## After 4–6 weeks of live use
 - [ ] Fit Recovery weights to check-in ratings
+- [x] Recovery vs how you felt (Trends): each check-in rating against that day's Recovery; correlation after 7 mornings
+- [x] Week in review (Trends, and a Today card on Sunday and Monday): last 7 days vs the 7 before
 - [x] Resilience (14-day balance, Trends tab)
 - [x] "Followed the plan" streak (Today)
 - [x] Reminders: wind down (1 h before bedtime) and morning check-in (30 min after waking); caffeine cutoff skipped by PAK

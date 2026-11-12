@@ -476,3 +476,141 @@ struct FocusView: View {
         .padding(.vertical, 11)
     }
 }
+
+// MARK: - Week in review
+
+struct WeekReviewView: View {
+    @Environment(MetricsStore.self) private var store
+    @Environment(JournalStore.self) private var journal
+
+    var body: some View {
+        DetailScaffold(title: "Week in review", accent: Color(hex: 0x4F7BFF)) {
+            if let w = ScoreEngine.weekReview(store.days) {
+                InsightCallout(text: verdict(w))
+                GlassCard {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Eyebrow(text: "Last 7 days vs the 7 before")
+                        row("Recovery", w.recovery.map { "\($0.percent)%" }, change(w.recovery, w.priorRecovery, unit: "", higherIsBetter: true))
+                        row("Sleep", w.sleep?.hoursMinutes, change(w.sleep.map { $0 / 60 }, w.priorSleep.map { $0 / 60 }, unit: " min", higherIsBetter: true))
+                        row("Strain", w.strain?.oneDecimal, change(w.strain, w.priorStrain, unit: "", higherIsBetter: nil, decimals: 1))
+                        row("HRV", w.hrv.map { "\(Int($0.rounded())) ms" }, change(w.hrv, w.priorHRV, unit: " ms", higherIsBetter: true))
+                    }
+                }
+                GlassCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Eyebrow(text: "Recovery by day")
+                        Chart(w.days) { d in
+                            if let r = d.recovery {
+                                BarMark(x: .value("Day", d.date, unit: .day), y: .value("Recovery", r))
+                                    .foregroundStyle(Theme.recoveryColor(r))
+                                    .cornerRadius(4)
+                            }
+                        }
+                        .chartYScale(domain: 0...100)
+                        .chartXAxis { AxisMarks(values: .stride(by: .day)) { _ in AxisValueLabel(format: .dateTime.weekday(.narrow)) } }
+                        .frame(height: 140)
+                        if let best = w.best, let worst = w.toughest, best.date != worst.date {
+                            Text("Best: \(best.date.formatted(.dateTime.weekday(.wide))) at \(best.recovery?.percent ?? "–")%. Toughest: \(worst.date.formatted(.dateTime.weekday(.wide))) at \(worst.recovery?.percent ?? "–")%.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                GlassCard {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Eyebrow(text: "Plan and sleep")
+                        row("Followed the plan", w.counted == 0 ? nil : "\(w.followed) of \(w.counted) days", nil)
+                        row("Sleep balance now", w.sleepBalance.map { b in abs(b) < 1800 ? "On target" : "\(b < 0 ? "−" : "+")\(abs(b).hoursMinutes)" }, nil)
+                        row("Check-ins", "\(checkIns(w)) of \(w.days.count) mornings", nil)
+                    }
+                }
+                let tags = tagCounts(w)
+                if !tags.isEmpty {
+                    GlassCard {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Eyebrow(text: "Your week in the journal")
+                            ForEach(tags) { t in
+                                HStack(spacing: 10) {
+                                    Image(systemName: t.behavior.symbol).frame(width: 22).foregroundStyle(.secondary)
+                                    Text(t.behavior.title).font(.callout)
+                                    Spacer()
+                                    if let next = t.nextRecovery {
+                                        Text("next day \(next.percent)%").font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    Text("\(t.yes)×").font(.callout.weight(.semibold)).monospacedDigit()
+                                }
+                            }
+                            Text("One week is too short to say what helps. The Journal tab's effects need 10+ days each way.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } else {
+                InsightCallout(text: "Your week in review appears after a few days of data.")
+            }
+        }
+    }
+
+    private func row(_ title: String, _ value: String?, _ delta: (String, Color)?) -> some View {
+        HStack {
+            Text(title).font(.callout)
+            Spacer()
+            if let delta { Text(delta.0).font(.caption.weight(.semibold)).foregroundStyle(delta.1) }
+            Text(value ?? "–").font(.callout.weight(.semibold)).monospacedDigit()
+        }
+        .padding(.vertical, 8)
+    }
+
+    /// "+4" style change, coloured only when the direction clearly matters.
+    private func change(_ now: Double?, _ before: Double?, unit: String, higherIsBetter: Bool?, decimals: Int = 0) -> (String, Color)? {
+        guard let now, let before else { return nil }
+        let diff = now - before
+        let text = decimals == 0 ? "\(diff >= 0 ? "+" : "−")\(Int(abs(diff).rounded()))\(unit)" : "\(diff >= 0 ? "+" : "−")\(String(format: "%.1f", abs(diff)))\(unit)"
+        guard let higherIsBetter, abs(diff) >= (decimals == 0 ? 1 : 0.1) else { return (text, .secondary) }
+        return (text, (diff > 0) == higherIsBetter ? Theme.helps : Theme.hurts)
+    }
+
+    private func checkIns(_ w: ScoreEngine.WeekReview) -> Int {
+        w.days.filter { store.dayLog(for: $0.date).checkedInAt != nil }.count
+    }
+
+    /// Each tag answered yes this week, how often, and the average Recovery the morning after.
+    struct TagWeek: Identifiable {
+        var behavior: Behavior
+        var yes: Int
+        var nextRecovery: Double?
+        var id: String { behavior.id }
+    }
+
+    private func tagCounts(_ w: ScoreEngine.WeekReview) -> [TagWeek] {
+        let cal = Calendar.current
+        let recoveryByKey = Dictionary(store.days.compactMap { d in d.recovery.map { (JournalStore.key(d.date), $0) } }, uniquingKeysWith: { a, _ in a })
+        return Behavior.all.compactMap { b -> TagWeek? in
+            let yesDays = w.days.filter { journal.answer(b.id, on: $0.date) == true }
+            guard !yesDays.isEmpty else { return nil }
+            let next = yesDays.compactMap { d in cal.date(byAdding: .day, value: 1, to: d.date).flatMap { recoveryByKey[JournalStore.key($0)] } }
+            return TagWeek(behavior: b, yes: yesDays.count, nextRecovery: next.isEmpty ? nil : next.reduce(0, +) / Double(next.count))
+        }
+        .sorted { $0.yes > $1.yes }
+    }
+
+    private func verdict(_ w: ScoreEngine.WeekReview) -> String {
+        var parts: [String] = []
+        if let r = w.recovery {
+            var line = "Recovery averaged \(r.percent)%"
+            if let p = w.priorRecovery {
+                let d = r - p
+                line += abs(d) < 3 ? ", about the same as the week before." : d > 0 ? ", up \(Int(d.rounded())) on the week before." : ", down \(Int((-d).rounded())) on the week before."
+            } else { line += "." }
+            parts.append(line)
+        }
+        if let s = w.sleep {
+            let goal = store.profile.sleepGoalHours * 3600
+            let gap = s - goal
+            parts.append(abs(gap) < 15 * 60 ? "Sleep was right on your \(Int(store.profile.sleepGoalHours)) h goal." :
+                         gap < 0 ? "Sleep ran \(Int((-gap / 60).rounded())) min a night short of your goal." :
+                                   "Sleep ran \(Int((gap / 60).rounded())) min a night over your goal.")
+        }
+        if w.counted > 0 { parts.append("You followed the plan on \(w.followed) of \(w.counted) days.") }
+        return parts.joined(separator: " ")
+    }
+}

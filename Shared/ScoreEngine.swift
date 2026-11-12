@@ -277,6 +277,86 @@ enum ScoreEngine {
         var change: Double?        // vs. the 14 days before
     }
 
+    // MARK: Week in review
+
+    struct WeekReview {
+        var days: [DayScores]
+        var recovery: Double?, priorRecovery: Double?
+        var sleep: TimeInterval?, priorSleep: TimeInterval?
+        var strain: Double?, priorStrain: Double?
+        var hrv: Double?, priorHRV: Double?
+        var followed: Int, counted: Int
+        var best: DayScores?, toughest: DayScores?
+        var sleepBalance: TimeInterval?
+    }
+
+    /// The last 7 days against the 7 before. Strain and the plan count finished days only; today is still open.
+    static func weekReview(_ all: [DayScores]) -> WeekReview? {
+        guard all.count >= 3 else { return nil }
+        let week = Array(all.suffix(7))
+        let prior = Array(all.dropLast(7).suffix(7))
+        func avg(_ v: [Double]) -> Double? { v.isEmpty ? nil : v.reduce(0, +) / Double(v.count) }
+        func avgRecovery(_ d: [DayScores]) -> Double? { avg(d.compactMap(\.recovery)) }
+        func avgSleep(_ d: [DayScores]) -> Double? { avg(d.compactMap { $0.raw.sleep?.asleep }) }
+        func avgStrain(_ d: [DayScores]) -> Double? { avg(d.dropLast().filter { !$0.raw.heartRate.isEmpty }.map(\.strain)) }
+        func avgHRV(_ d: [DayScores]) -> Double? { avg(d.compactMap(\.raw.hrv)) }
+        let finished = week.dropLast().filter { !$0.raw.heartRate.isEmpty }
+        let followed = finished.filter { d in
+            let t = strainTarget(for: d)
+            return d.strain >= t.lowerBound - 1 && d.strain <= t.upperBound + 1
+        }.count
+        let scored = week.filter { $0.recovery != nil }
+        return WeekReview(days: week,
+                          recovery: avgRecovery(week), priorRecovery: avgRecovery(prior),
+                          sleep: avgSleep(week), priorSleep: avgSleep(prior),
+                          strain: avgStrain(week), priorStrain: prior.isEmpty ? nil : avg(prior.filter { !$0.raw.heartRate.isEmpty }.map(\.strain)),
+                          hrv: avgHRV(week), priorHRV: avgHRV(prior),
+                          followed: followed, counted: finished.count,
+                          best: scored.max { ($0.recovery ?? 0) < ($1.recovery ?? 0) },
+                          toughest: scored.min { ($0.recovery ?? 0) < ($1.recovery ?? 0) },
+                          sleepBalance: week.last?.sleepBalance)
+    }
+
+    // MARK: Recovery vs how you felt
+
+    struct FeltPair: Identifiable {
+        var id: Date { date }
+        var date: Date
+        var felt: Int
+        var recovery: Double
+    }
+
+    struct FeltAgreement {
+        var pairs: [FeltPair]
+        var r: Double?                 // Pearson correlation, once there are enough mornings
+        var averages: [Int: Double]    // mean Recovery per rating
+        static let minimum = 7
+    }
+
+    /// Pairs each morning's 1–5 rating with that day's Recovery score.
+    static func feltAgreement(_ days: [DayScores], logs: [String: DayLog]) -> FeltAgreement {
+        let pairs = days.compactMap { d -> FeltPair? in
+            guard let r = d.recovery, let felt = logs[DayLogStore.dayKey(d.date)]?.readiness else { return nil }
+            return FeltPair(date: d.date, felt: felt, recovery: r)
+        }
+        var sums: [Int: (Double, Int)] = [:]
+        for p in pairs { let s = sums[p.felt] ?? (0, 0); sums[p.felt] = (s.0 + p.recovery, s.1 + 1) }
+        let averages = sums.mapValues { $0.0 / Double($0.1) }
+        var r: Double?
+        if pairs.count >= FeltAgreement.minimum {
+            let n = Double(pairs.count)
+            let mx = pairs.map { Double($0.felt) }.reduce(0, +) / n
+            let my = pairs.map(\.recovery).reduce(0, +) / n
+            var sxx = 0.0, syy = 0.0, sxy = 0.0
+            for p in pairs {
+                let dx = Double(p.felt) - mx, dy = p.recovery - my
+                sxx += dx * dx; syy += dy * dy; sxy += dx * dy
+            }
+            if sxx > 0, syy > 0 { r = sxy / (sxx * syy).squareRoot() }
+        }
+        return FeltAgreement(pairs: pairs, r: r, averages: averages)
+    }
+
     /// Oura-style 14-day balance of strain on the system and recovery from it. Needs 10+ days with Recovery.
     static func resilience(_ days: [DayScores]) -> Resilience? {
         func compute(_ window: [DayScores]) -> (score: Double, rec: Double, calm: Double, sleep: Double)? {

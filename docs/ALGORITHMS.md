@@ -214,3 +214,11 @@ days up to yesterday; the card also shows hits over the last 14 days.
 
 Wind down: 1 h before tonight's recommended bedtime. Morning check-in: 30 min after your 7-night typical wake time,
 skipped once today's check-in is saved. Both are rescheduled whenever the app opens.
+
+## Week in review
+
+The last 7 days against the 7 before. Averages of Recovery, sleep (time asleep) and HRV use every day with data. Strain and "followed the plan" count finished days only (today is still open) with heart-rate data. Plan uses the same rule as the streak: strain inside the day's target ±1. Journal rows show each tag's yes count this week and the average Recovery the morning after; one week is not enough to judge an effect, so the Journal tab's impact rule (10+ days each way) still decides that.
+
+## Recovery vs how you felt
+
+Each morning with both a 1–5 readiness rating and a Recovery score is one pair (last 60 days). After 7 pairs, Nine30 shows the Pearson correlation: 0.5 or more "matches", 0.25–0.5 "loosely matches", below 0.25 "doesn't line up yet". It also shows mean Recovery for ratings 4–5 against 1–2 (or 3). These are the same pairs the Recovery auto-fit will use at 30 check-ins.
